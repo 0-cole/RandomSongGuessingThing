@@ -479,7 +479,8 @@ document.addEventListener("DOMContentLoaded", () => {
         try {
             const res = await fetch("/api/playlists");
             const data = await res.json();
-            renderUserPlaylists(data.playlists || []);
+            renderUserPlaylists(data.my_playlists || data.playlists || []);
+            renderCuratedPlaylists(data.curated_playlists || []);
         } catch (err) {
             console.error("Error fetching playlists:", err);
         }
@@ -513,7 +514,7 @@ document.addEventListener("DOMContentLoaded", () => {
     function renderUserPlaylists(playlists) {
         userPlaylistsGrid.innerHTML = "";
         if (!playlists.length) {
-            userPlaylistsGrid.innerHTML = `<div class="empty-playlists-note">No custom playlists found. Connect Spotify to load yours!</div>`;
+            userPlaylistsGrid.innerHTML = `<div class="empty-playlists-note">No playlists created by you found in your account yet.</div>`;
             return;
         }
 
@@ -524,28 +525,82 @@ document.addEventListener("DOMContentLoaded", () => {
                 <img src="${p.image || ''}" alt="Cover">
                 <div class="p-info">
                     <div class="p-title">${p.name}</div>
-                    <div class="p-count">${p.tracks_count} tracks</div>
+                    <div class="p-count">${p.tracks_count} tracks • By you</div>
                 </div>
             `;
-            card.addEventListener("click", async () => {
-                closeModals();
-                showSpinner(true);
-                try {
-                    const res = await fetch("/api/game/pool", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ mode: "playlist", playlist_id: p.id, playlist_name: p.name })
-                    });
-                    const data = await res.json();
+            card.addEventListener("click", () => selectPlaylist(p.id, p.name));
+            userPlaylistsGrid.appendChild(card);
+        });
+    }
+
+    function renderCuratedPlaylists(curated) {
+        const grid = document.getElementById("curated-playlists-grid");
+        if (!grid) return;
+        grid.innerHTML = "";
+        curated.forEach(p => {
+            const card = document.createElement("div");
+            card.className = "playlist-card";
+            card.innerHTML = `
+                <img src="${p.image || ''}" alt="Cover">
+                <div class="p-info">
+                    <div class="p-title">${p.name}</div>
+                    <div class="p-count">${p.desc}</div>
+                </div>
+            `;
+            card.addEventListener("click", () => selectPlaylist(p.id, p.name));
+            grid.appendChild(card);
+        });
+    }
+
+    async function selectPlaylist(id, name) {
+        closeModals();
+        showSpinner(true);
+        try {
+            const res = await fetch("/api/game/pool", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ mode: "playlist", playlist_id: id, playlist_name: name })
+            });
+            const data = await res.json();
+            applyGameState(data.round);
+            refreshStatus();
+            showToast(`Playing from "${name}"!`);
+        } catch (err) {
+            console.error("Failed to select playlist:", err);
+        } finally {
+            showSpinner(false);
+        }
+    }
+
+    const btnLoadCustom = document.getElementById("btn-load-custom-playlist");
+    const inputCustom = document.getElementById("input-custom-playlist");
+    if (btnLoadCustom && inputCustom) {
+        btnLoadCustom.addEventListener("click", async () => {
+            const val = inputCustom.value.trim();
+            if (!val) return;
+            btnLoadCustom.disabled = true;
+            btnLoadCustom.textContent = "Loading...";
+            try {
+                const res = await fetch("/api/playlists/load_custom", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ url_or_id: val })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    closeModals();
                     applyGameState(data.round);
                     refreshStatus();
-                } catch (err) {
-                    console.error("Failed to select playlist:", err);
-                } finally {
-                    showSpinner(false);
+                    showToast("Loaded playlist!");
+                } else {
+                    alert(data.error || "Could not load playlist.");
                 }
-            });
-            userPlaylistsGrid.appendChild(card);
+            } catch (err) {
+                alert("Failed to load playlist: " + err);
+            } finally {
+                btnLoadCustom.disabled = false;
+                btnLoadCustom.textContent = "Load & Play";
+            }
         });
     }
 

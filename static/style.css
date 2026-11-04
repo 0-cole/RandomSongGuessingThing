@@ -80,8 +80,10 @@ body {
 
 .logo {
     font-family: var(--font-heading);
-    font-size: 1.15rem;
-    font-weight: 800;
+    font-size: 0.95rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    opacity: 0.92;
     letter-spacing: 0.04em;
     display: flex;
     align-items: center;
@@ -1094,4 +1096,17 @@ kbd {
 
 @keyframes spin {
     to { transform: rotate(360deg); }
+}
+
+
+/* Bottom Right Corner Disclaimer */
+.bottom-right-footnote {
+    position: fixed;
+    bottom: 12px;
+    right: 16px;
+    font-size: 0.72rem;
+    color: var(--color-text-subtle);
+    pointer-events: none;
+    user-select: none;
+    z-index: 100;
 }

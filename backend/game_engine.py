@@ -139,8 +139,14 @@ class GameEngine:
                 self.playlist_name = "Liked Songs"
             
             if not tracks:
-                tracks = DEMO_TRACKS
-                self.playlist_name = "Demo / Sample Pack"
+                # Try loading tracks from user's cached library before giving up to Demo Pack
+                cached_backup = self.spotify_mgr.fetch_playlist_tracks("3UFunkZK4io2zd8dnSViOz", limit=50)
+                if cached_backup:
+                    tracks = cached_backup
+                    self.playlist_name = "Your Top Tracks (Cached Rotation)"
+                else:
+                    tracks = DEMO_TRACKS
+                    self.playlist_name = "Demo / Sample Pack"
 
         self.track_pool = tracks
         self.played_track_ids.clear()

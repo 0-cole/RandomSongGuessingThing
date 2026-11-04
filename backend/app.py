@@ -7,7 +7,7 @@ from backend.game_engine import GameEngine
 
 STATIC_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
 
-__version__ = '1.0.2'
+__version__ = '1.0.3'
 
 app = Flask(__name__, static_folder=STATIC_DIR)
 
@@ -82,18 +82,57 @@ def logout():
 
 @app.route("/api/playlists", methods=["GET"])
 def get_playlists():
-    user_playlists = spotify_mgr.fetch_playlists() if spotify_mgr.is_connected else []
+    import re
+    all_playlists = spotify_mgr.fetch_playlists() if spotify_mgr.is_connected else []
+    
+    my_playlists = [p for p in all_playlists if p.get("is_mine")]
+    saved_playlists = [p for p in all_playlists if not p.get("is_mine")]
+
     categories = [
         {"id": "easy", "name": "🔥 Easy: Heavy Rotation (Past 4 Weeks)", "desc": "Songs you've been listening to on repeat"},
         {"id": "medium", "name": "⚡ Medium: Familiar Favorites (Past 6 Months)", "desc": "Your regular rotation & favorite tracks"},
         {"id": "hard", "name": "💀 Hard: Deep Cuts (All-Time)", "desc": "Your library archive, forgotten favorites & deep tracks"},
         {"id": "liked", "name": "❤️ Liked Songs", "desc": "All songs from your Spotify Liked library"}
     ]
+
+    curated = [
+        {"id": "37i9dQZF1DXcBWIGoYBM5M", "name": "🌟 Today's Top Hits", "desc": "The biggest pop & viral hits right now on Spotify", "image": "https://i.scdn.co/image/ab67706f00000002b0fe40a6e1692822f5a9d8f1"},
+        {"id": "37i9dQZF1DX4o1oenSJRJd", "name": "🪩 2000s Pop Throwbacks", "desc": "Nostalgic 2000s pop anthems", "image": "https://i.scdn.co/image/ab67706f000000021665e8a719bd183f044bb775"},
+        {"id": "37i9dQZF1DX0XUsuxWHRQd", "name": "🎧 RapCaviar", "desc": "Top hip-hop & rap tracks", "image": "https://i.scdn.co/image/ab67706f00000002ca5a7517156021292e5663a6"},
+        {"id": "37i9dQZF1DWXRqgorJj26U", "name": "🎸 Rock Classics", "desc": "Timeless rock & alternative classics", "image": "https://i.scdn.co/image/ab67706f00000002fe24d7084be4aa228871629b"},
+        {"id": "37i9dQZF1DXbTxeAdrVG2l", "name": "📻 90s Hits", "desc": "Iconic 90s music across all genres", "image": "https://i.scdn.co/image/ab67706f0000000234d8ee34bc819e62fe8971f4"},
+        {"id": "37i9dQZF1DXdfOcg1fm0VG", "name": "🎮 Video Game Soundtracks", "desc": "Iconic gaming themes & osts", "image": "https://i.scdn.co/image/ab67706f00000002c0b43538e1a7baee6f23ce08"},
+        {"id": "37i9dQZF1DXdLEN7aqioXM", "name": "🌙 Chill / Lofi Beats", "desc": "Smooth beats to relax & guess", "image": "https://i.scdn.co/image/ab67706f00000002b8529aa87e596700ef5417ab"}
+    ]
+
     return jsonify({
         "categories": categories,
-        "playlists": user_playlists,
+        "my_playlists": my_playlists,
+        "saved_playlists": saved_playlists,
+        "curated_playlists": curated,
+        "playlists": my_playlists,
         "is_connected": spotify_mgr.is_connected
     })
+
+@app.route("/api/playlists/load_custom", methods=["POST"])
+def load_custom_playlist():
+    import re
+    data = request.json or {}
+    raw_input = data.get("url_or_id", "").strip()
+    if not raw_input:
+        return jsonify({"success": False, "error": "Please provide a Spotify playlist link or ID"}), 400
+
+    m = re.search(r"playlist[/:]+([a-zA-Z0-9]+)", raw_input)
+    playlist_id = m.group(1) if m else raw_input
+
+    tracks = spotify_mgr.fetch_playlist_tracks(playlist_id, limit=100)
+    if not tracks:
+        return jsonify({"success": False, "error": f"Could not find or load tracks for playlist '{playlist_id}'"}), 400
+
+    playlist_name = data.get("name") or f"Custom Playlist ({len(tracks)} tracks)"
+    res = game_engine.load_pool(mode="playlist", playlist_id=playlist_id, playlist_name=playlist_name)
+    round_state = game_engine.start_new_round()
+    return jsonify({"success": True, "pool": res, "round": round_state})
 
 @app.route("/api/game/pool", methods=["POST"])
 def set_game_pool():

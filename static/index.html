@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Songless — Spotify Edition</title>
+    <title>Spoti-less</title>
     <link rel="stylesheet" href="style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -23,7 +23,7 @@
             </div>
 
             <div class="nav-center">
-                <h1 class="logo">SONGLESS <span class="badge-spotify">SPOTIFY</span></h1>
+                <h1 class="logo">SPOTI-LESS</h1>
             </div>
 
             <div class="nav-right">
@@ -260,10 +260,22 @@
                     </div>
                 </div>
 
-                <h4 class="section-title">Your Custom Spotify Playlists</h4>
-                <div class="playlists-grid" id="user-playlists-grid">
-                    <div class="empty-playlists-note">Connect your Spotify account to play with any of your custom playlists!</div>
+                <!-- Load Any Spotify Playlist -->
+                <h4 class="section-title">Load Any Spotify Playlist (Paste Link)</h4>
+                <div class="custom-playlist-loader" style="display: flex; gap: 10px; margin-bottom: 20px;">
+                    <input type="text" id="input-custom-playlist" placeholder="Paste any Spotify playlist link or ID..." style="flex: 1; height: 46px; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 0 14px; color: var(--color-text); font-size: 0.9rem; outline: none;">
+                    <button id="btn-load-custom-playlist" class="btn btn-secondary" style="height: 46px; padding: 0 18px; font-weight: 700;">Load & Play</button>
                 </div>
+
+                <!-- Your Created Playlists -->
+                <h4 class="section-title">Your Created Playlists (Only Yours)</h4>
+                <div class="playlists-grid" id="user-playlists-grid">
+                    <div class="empty-playlists-note">Loading your created playlists...</div>
+                </div>
+
+                <!-- Spotify Categories & Whole Catalog -->
+                <h4 class="section-title" style="margin-top: 24px;">Popular Spotify Playlists & Genres</h4>
+                <div class="playlists-grid" id="curated-playlists-grid"></div>
             </div>
         </div>
     </div>
@@ -304,6 +316,9 @@
 
     <!-- Toast Notification -->
     <div id="toast" class="toast hidden">Copied score to clipboard!</div>
+
+    <!-- Bottom Right Disclaimer -->
+    <div class="bottom-right-footnote">* A Songless recreation using your own Spotify library.</div>
 
     <script src="audio_player.js"></script>
     <script src="app.js"></script>

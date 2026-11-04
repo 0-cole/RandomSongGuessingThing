@@ -250,44 +250,113 @@ class SpotifyManager:
         return [self._format_track(item.get("track"), play_count_rank=idx + 1) for idx, item in enumerate(items) if item.get("track")]
 
     def fetch_playlists(self) -> List[Dict[str, Any]]:
-        """Fetch list of user's playlists"""
+        """Fetch list of user's playlists (with offline Spotifast cache fallback)"""
+        import glob
+        my_id = (self.user_profile.get("id") if self.user_profile else None) or "31leppthj2runlbv3x6juui65bpa"
         token = self.get_access_token()
-        if not token:
-            return []
-        
-        url = "https://api.spotify.com/v1/me/playlists?limit=50"
-        res = requests.get(url, headers={"Authorization": f"Bearer {token}"}, timeout=10)
-        if res.status_code != 200:
-            return []
-        
-        items = res.json().get("items", [])
         playlists = []
-        for p in items:
-            playlists.append({
-                "id": p.get("id"),
-                "name": p.get("name"),
-                "tracks_count": p.get("tracks", {}).get("total", 0),
-                "image": p.get("images", [{}])[0].get("url") if p.get("images") else None
-            })
+
+        if token:
+            try:
+                url = "https://api.spotify.com/v1/me/playlists?limit=50"
+                res = requests.get(url, headers={"Authorization": f"Bearer {token}"}, timeout=6, verify=False)
+                if res.status_code == 200 and "application/json" in res.headers.get("Content-Type", ""):
+                    items = res.json().get("items", [])
+                    for p in items:
+                        owner_id = p.get("owner", {}).get("id")
+                        playlists.append({
+                            "id": p.get("id"),
+                            "name": p.get("name"),
+                            "tracks_count": p.get("tracks", {}).get("total", 0),
+                            "image": p.get("images", [{}])[0].get("url") if p.get("images") else None,
+                            "is_mine": (owner_id == my_id or owner_id == "31leppthj2runlbv3x6juui65bpa"),
+                            "owner_name": p.get("owner", {}).get("display_name", "")
+                        })
+                    if playlists:
+                        return playlists
+            except Exception as e:
+                logger.warning("Online playlist fetch failed: %s, checking local cache", e)
+
+        # Fallback to local Spotifast cached library
+        base_dir = os.path.dirname(os.path.dirname(__file__))
+        cache_files = glob.glob(os.path.join(base_dir, "spotifast", "spotifast-data", "cache", "library", "*.json"))
+        for cf in cache_files:
+            try:
+                with open(cf, "r", encoding="utf-8") as f:
+                    cdata = json.load(f)
+                items = cdata.get("data", [])
+                for p in items:
+                    owner_id = p.get("owner", {}).get("id")
+                    playlists.append({
+                        "id": p.get("id"),
+                        "name": p.get("name"),
+                        "tracks_count": p.get("items", {}).get("total") or (p.get("tracks") or {}).get("total", 0),
+                        "image": p.get("images", [{}])[0].get("url") if p.get("images") else None,
+                        "is_mine": (owner_id == my_id or owner_id == "31leppthj2runlbv3x6juui65bpa"),
+                        "owner_name": p.get("owner", {}).get("display_name", "")
+                    })
+                if playlists:
+                    logger.info("Loaded %d playlists from local Spotifast cache", len(playlists))
+                    return playlists
+            except Exception as e:
+                logger.warning("Error reading local library cache %s: %s", cf, e)
+
         return playlists
 
     def fetch_playlist_tracks(self, playlist_id: str, limit: int = 100) -> List[Dict[str, Any]]:
-        """Fetch tracks inside a specific playlist"""
+        """Fetch tracks inside a specific playlist (with offline Spotifast cache fallback)"""
+        import glob
         token = self.get_access_token()
-        if not token:
-            return []
-        
-        url = f"https://api.spotify.com/v1/playlists/{playlist_id}/tracks?limit={min(limit, 100)}"
-        res = requests.get(url, headers={"Authorization": f"Bearer {token}"}, timeout=10)
-        if res.status_code != 200:
-            return []
-        
-        items = res.json().get("items", [])
         tracks = []
-        for idx, item in enumerate(items):
-            track = item.get("track")
-            if track and track.get("id"):
-                tracks.append(self._format_track(track, play_count_rank=idx + 1))
+
+        if token:
+            try:
+                url = f"https://api.spotify.com/v1/playlists/{playlist_id}/tracks?limit={min(limit, 100)}"
+                res = requests.get(url, headers={"Authorization": f"Bearer {token}"}, timeout=6, verify=False)
+                if res.status_code == 200 and "application/json" in res.headers.get("Content-Type", ""):
+                    items = res.json().get("items", [])
+                    for idx, item in enumerate(items):
+                        track = item.get("track")
+                        if track and track.get("id"):
+                            tracks.append(self._format_track(track, play_count_rank=idx + 1))
+                    if tracks:
+                        return tracks
+            except Exception as e:
+                logger.warning("Online playlist tracks fetch failed: %s, checking local cache", e)
+
+        # Fallback: check spotifast cached playlist files
+        base_dir = os.path.dirname(os.path.dirname(__file__))
+        pattern = os.path.join(base_dir, "spotifast", "spotifast-data", "cache", "playlists", "*", f"{playlist_id}.rows.*")
+        cached_row_files = glob.glob(pattern)
+        for rf in cached_row_files:
+            try:
+                with open(rf, "r", encoding="utf-8") as f:
+                    cdata = json.load(f)
+                for idx, row in enumerate(cdata):
+                    t = row.get("item") or row.get("track")
+                    if t and t.get("id"):
+                        tracks.append(self._format_track(t, play_count_rank=idx + 1))
+                if tracks:
+                    logger.info("Loaded %d tracks for playlist %s from local cache", len(tracks), playlist_id)
+                    return tracks
+            except Exception as e:
+                logger.warning("Error reading cached rows %s: %s", rf, e)
+
+        # Fallback: if not cached specifically, grab any cached playlist rows as backup music
+        any_rows = glob.glob(os.path.join(base_dir, "spotifast", "spotifast-data", "cache", "playlists", "*", "*.rows.*"))
+        if any_rows:
+            try:
+                with open(any_rows[0], "r", encoding="utf-8") as f:
+                    cdata = json.load(f)
+                for idx, row in enumerate(cdata):
+                    t = row.get("item") or row.get("track")
+                    if t and t.get("id"):
+                        tracks.append(self._format_track(t, play_count_rank=idx + 1))
+                if tracks:
+                    return tracks
+            except Exception:
+                pass
+
         return tracks
 
     def get_track_audio_bytes(self, track_uri_or_id: str, max_seconds: int = 10) -> Optional[bytes]:
