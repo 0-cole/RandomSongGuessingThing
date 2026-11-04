@@ -553,7 +553,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     async function selectPlaylist(id, name) {
-        closeModals();
         showSpinner(true);
         try {
             const res = await fetch("/api/game/pool", {
@@ -562,11 +561,19 @@ document.addEventListener("DOMContentLoaded", () => {
                 body: JSON.stringify({ mode: "playlist", playlist_id: id, playlist_name: name })
             });
             const data = await res.json();
+            if (!res.ok || data.success === false) {
+                alert((data.error || `Could not load songs for "${name}".`) + "
+
+Tip: Connect to cellular hotspot or VPN so Spotify API endpoints aren't blocked by the school firewall!");
+                return;
+            }
+            closeModals();
             applyGameState(data.round);
             refreshStatus();
             showToast(`Playing from "${name}"!`);
         } catch (err) {
             console.error("Failed to select playlist:", err);
+            alert("Error loading playlist: " + err);
         } finally {
             showSpinner(false);
         }

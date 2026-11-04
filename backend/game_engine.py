@@ -139,11 +139,18 @@ class GameEngine:
                 self.playlist_name = "Liked Songs"
             
             if not tracks:
-                # Try loading tracks from user's cached library before giving up to Demo Pack
+                if mode == "playlist":
+                    return {
+                        "success": False,
+                        "mode": mode,
+                        "playlist_name": self.playlist_name,
+                        "total_tracks": 0,
+                        "error": f"Could not load songs for '{self.playlist_name}'. Spotify is blocked on this network and this playlist has not been cached yet."
+                    }
                 cached_backup = self.spotify_mgr.fetch_playlist_tracks("3UFunkZK4io2zd8dnSViOz", limit=50)
                 if cached_backup:
                     tracks = cached_backup
-                    self.playlist_name = "Your Top Tracks (Cached Rotation)"
+                    self.playlist_name = "Your Library (Offline Rotation)"
                 else:
                     tracks = DEMO_TRACKS
                     self.playlist_name = "Demo / Sample Pack"

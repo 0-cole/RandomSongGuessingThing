@@ -7,7 +7,7 @@ from backend.game_engine import GameEngine
 
 STATIC_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
 
-__version__ = '1.0.4'
+__version__ = '1.0.5'
 
 app = Flask(__name__, static_folder=STATIC_DIR)
 
@@ -142,9 +142,11 @@ def set_game_pool():
     playlist_name = data.get("playlist_name", "")
     
     result = game_engine.load_pool(mode=mode, playlist_id=playlist_id, playlist_name=playlist_name)
+    if not result.get("success"):
+        return jsonify({"success": False, "error": result.get("error")}), 400
     # Automatically kick off a fresh round in the new mode
     round_state = game_engine.start_new_round()
-    return jsonify({"pool": result, "round": round_state})
+    return jsonify({"success": True, "pool": result, "round": round_state})
 
 # ----------------- Game Loop Endpoints -----------------
 

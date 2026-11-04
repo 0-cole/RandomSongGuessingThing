@@ -342,20 +342,7 @@ class SpotifyManager:
             except Exception as e:
                 logger.warning("Error reading cached rows %s: %s", rf, e)
 
-        # Fallback: if not cached specifically, grab any cached playlist rows as backup music
-        any_rows = glob.glob(os.path.join(base_dir, "spotifast", "spotifast-data", "cache", "playlists", "*", "*.rows.*"))
-        if any_rows:
-            try:
-                with open(any_rows[0], "r", encoding="utf-8") as f:
-                    cdata = json.load(f)
-                for idx, row in enumerate(cdata):
-                    t = row.get("item") or row.get("track")
-                    if t and t.get("id"):
-                        tracks.append(self._format_track(t, play_count_rank=idx + 1))
-                if tracks:
-                    return tracks
-            except Exception:
-                pass
+
 
         return tracks
 
