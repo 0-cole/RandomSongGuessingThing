@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Songless — Spotify Edition</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400..800;1,9..40,400..800&family=Poppins:wght@600;700;800;900&display=swap" rel="stylesheet">
+</head>
+<body class="dark-theme">
+    <!-- Main App Container -->
+    <div class="app-layout">
+        <!-- Top Navigation -->
+        <header class="navbar">
+            <div class="nav-left">
+                <button id="btn-open-mode" class="nav-pill" title="Select Difficulty or Playlist">
+                    <span class="pill-dot"></span>
+                    <span id="active-pool-label">🔥 Heavy Rotation</span>
+                    <svg class="chevron-icon" viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M7 10l5 5 5-5z"/></svg>
+                </button>
+            </div>
+
+            <div class="nav-center">
+                <h1 class="logo">SONGLESS <span class="badge-spotify">SPOTIFY</span></h1>
+            </div>
+
+            <div class="nav-right">
+                <div class="streak-pill" title="Current Win Streak">
+                    <span class="streak-flame">🔥</span>
+                    <span id="streak-counter">0</span>
+                </div>
+                <button id="btn-open-stats" class="icon-button" title="Your Stats">
+                    <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M5 9.2h3V19H5zM10.6 5h2.8v14h-2.8zm5.6 8H19v6h-2.8z"/></svg>
+                </button>
+                <button id="btn-open-auth" class="nav-pill nav-auth-pill" title="Spotify Account">
+                    <span id="auth-status-dot" class="dot-disconnected"></span>
+                    <span id="auth-username-label">Spotify</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Guessing Stage -->
+        <main class="game-container">
+            <!-- Audio Player & Snippet Timeline Card -->
+            <section class="player-card">
+                <div class="visualizer-container">
+                    <canvas id="waveform-canvas" width="600" height="48"></canvas>
+                </div>
+
+                <div class="player-controls">
+                    <button id="btn-play" class="btn-circle-play" title="Play snippet (Spacebar)">
+                        <svg id="icon-play" viewBox="0 0 24 24" width="28" height="28"><path fill="currentColor" d="M8 5v14l11-7z"/></svg>
+                        <svg id="icon-pause" class="hidden" viewBox="0 0 24 24" width="28" height="28"><path fill="currentColor" d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+                    </button>
+                    
+                    <div class="playback-info">
+                        <span id="label-playback-time">0.1s</span>
+                        <span class="label-playback-max">/ 5.0s</span>
+                    </div>
+
+                    <div id="loading-spinner" class="spinner hidden" title="Loading audio buffer..."></div>
+                </div>
+
+                <!-- Segmented Stepper Timeline -->
+                <div class="timeline-bar" id="timeline-segments">
+                    <div class="segment" data-index="0" data-time="0.1"><div class="fill"></div><span class="seg-label">0.1s</span></div>
+                    <div class="segment" data-index="1" data-time="0.25"><div class="fill"></div><span class="seg-label">+0.15s</span></div>
+                    <div class="segment" data-index="2" data-time="0.5"><div class="fill"></div><span class="seg-label">+0.25s</span></div>
+                    <div class="segment" data-index="3" data-time="1.0"><div class="fill"></div><span class="seg-label">+0.5s</span></div>
+                    <div class="segment" data-index="4" data-time="2.0"><div class="fill"></div><span class="seg-label">+1.0s</span></div>
+                    <div class="segment" data-index="5" data-time="5.0"><div class="fill"></div><span class="seg-label">+3.0s</span></div>
+                </div>
+            </section>
+
+            <!-- Guess Slots (6 Rows) -->
+            <section class="guesses-list" id="guesses-container">
+                <div class="guess-row empty" data-row="0"><span class="row-num">1</span><span class="guess-text"></span></div>
+                <div class="guess-row empty" data-row="1"><span class="row-num">2</span><span class="guess-text"></span></div>
+                <div class="guess-row empty" data-row="2"><span class="row-num">3</span><span class="guess-text"></span></div>
+                <div class="guess-row empty" data-row="3"><span class="row-num">4</span><span class="guess-text"></span></div>
+                <div class="guess-row empty" data-row="4"><span class="row-num">5</span><span class="guess-text"></span></div>
+                <div class="guess-row empty" data-row="5"><span class="row-num">6</span><span class="guess-text"></span></div>
+            </section>
+
+            <!-- Search & Actions -->
+            <section class="action-dock">
+                <div class="search-box-wrapper">
+                    <svg class="search-icon" viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+                    <input type="text" id="input-guess" placeholder="Search a song or artist in your pool..." autocomplete="off">
+                    <button id="btn-clear-search" class="clear-btn hidden">&times;</button>
+                    <!-- Autocomplete dropdown -->
+                    <div id="autocomplete-list" class="autocomplete-dropdown hidden"></div>
+                </div>
+
+                <div class="action-buttons-row">
+                    <button id="btn-skip" class="btn btn-secondary">
+                        <span id="skip-text">Skip (+0.15s)</span>
+                    </button>
+                    <button id="btn-submit" class="btn btn-primary" disabled>
+                        <span>Submit Guess</span>
+                    </button>
+                </div>
+
+                <div class="dock-footer">
+                    <button id="btn-give-up" class="btn-link">Give up / Reveal Song</button>
+                    <span class="hotkey-hint">Press <kbd>Space</kbd> to play, <kbd>Enter</kbd> to guess</span>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- REVEAL / VICTORY / GAME OVER MODAL -->
+    <div id="modal-reveal" class="modal-overlay hidden">
+        <div class="modal-card reveal-card">
+            <div id="reveal-header" class="reveal-header win">
+                <div class="reveal-badge-icon" id="reveal-status-icon">🎉</div>
+                <h2 id="reveal-title">You Nailed It!</h2>
+                <p id="reveal-subtitle">Solved in 0.1 seconds</p>
+            </div>
+
+            <div class="reveal-song-hero">
+                <div class="cover-wrapper">
+                    <img id="reveal-album-art" src="" alt="Album Artwork">
+                    <div class="cover-overlay-play" id="btn-play-reveal-song">
+                        <svg viewBox="0 0 24 24" width="36" height="36"><path fill="currentColor" d="M8 5v14l11-7z"/></svg>
+                    </div>
+                </div>
+                <div class="song-details">
+                    <h3 id="reveal-song-name">Song Name</h3>
+                    <p id="reveal-artist-name">Artist Name</p>
+                    <span id="reveal-album-name" class="album-tag">Album Title</span>
+                </div>
+            </div>
+
+            <!-- Guess Grid Preview -->
+            <div class="reveal-grid" id="reveal-emoji-grid">
+                <!-- Emoji blocks will be rendered here -->
+            </div>
+
+            <div class="reveal-actions">
+                <button id="btn-share" class="btn btn-secondary btn-icon-text">
+                    <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92c0-1.61-1.31-2.92-2.92-2.92z"/></svg>
+                    <span>Share Result</span>
+                </button>
+                <button id="btn-next-song" class="btn btn-primary btn-glow">
+                    <span>Next Song &rarr;</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SPOTIFY AUTH MODAL -->
+    <div id="modal-auth" class="modal-overlay hidden">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h2>Connect Spotify</h2>
+                <button class="modal-close-btn" data-modal="modal-auth">&times;</button>
+            </div>
+
+            <div class="auth-tabs">
+                <button class="tab-btn active" data-tab="tab-zeroconf">Spotify Connect (Spotifast style)</button>
+                <button class="tab-btn" data-tab="tab-credentials">Username & Password</button>
+            </div>
+
+            <!-- Tab 1: Spotify Connect Pairing -->
+            <div id="tab-zeroconf" class="tab-content active">
+                <div class="instructions-box">
+                    <p><strong>1-Click Pairing with Spotifast or your phone:</strong></p>
+                    <ol>
+                        <li>Click <strong>"Start Discovery Device"</strong> below.</li>
+                        <li>In Spotifast (or the official Spotify app), open the <strong>Devices</strong> menu.</li>
+                        <li>Select <strong>"Songless Guessing Game"</strong>.</li>
+                        <li>You'll be authenticated instantly and saved forever!</li>
+                    </ol>
+                </div>
+                
+                <div class="zeroconf-action-area">
+                    <button id="btn-start-zeroconf" class="btn btn-primary btn-full">
+                        <span id="zc-btn-text">Start Discovery Device</span>
+                    </button>
+                    <p id="zc-status-text" class="status-subtext">Status: Idle</p>
+                </div>
+            </div>
+
+            <!-- Tab 2: Direct Username & Password -->
+            <div id="tab-credentials" class="tab-content">
+                <form id="form-user-pass">
+                    <div class="form-group">
+                        <label>Spotify Username or Email</label>
+                        <input type="text" id="auth-username" required placeholder="e.g. your_spotify_username">
+                    </div>
+                    <div class="form-group">
+                        <label>Spotify Password</label>
+                        <input type="password" id="auth-password" required placeholder="••••••••••••">
+                    </div>
+                    <button type="submit" id="btn-submit-userpass" class="btn btn-primary btn-full">
+                        Log In Directly
+                    </button>
+                    <p id="up-status-text" class="status-subtext"></p>
+                </form>
+            </div>
+
+            <!-- Connected Profile view (if already signed in) -->
+            <div id="auth-connected-view" class="connected-card hidden">
+                <div class="user-row">
+                    <img id="user-avatar" src="" alt="Avatar" class="avatar-img">
+                    <div>
+                        <h4 id="user-name-display">Username</h4>
+                        <span id="user-tier-badge" class="premium-badge">Spotify Premium</span>
+                    </div>
+                </div>
+                <button id="btn-logout" class="btn btn-secondary btn-full btn-danger">Disconnect Account</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- PLAYLIST & DIFFICULTY SELECTOR MODAL -->
+    <div id="modal-mode" class="modal-overlay hidden">
+        <div class="modal-card modal-wide">
+            <div class="modal-header">
+                <h2>Game Difficulty & Playlists</h2>
+                <button class="modal-close-btn" data-modal="modal-mode">&times;</button>
+            </div>
+
+            <div class="modal-body-scroll">
+                <h4 class="section-title">Difficulty by Listening Frequency</h4>
+                <div class="difficulty-grid" id="difficulty-options">
+                    <div class="mode-card selected" data-mode="easy">
+                        <div class="mode-badge easy">🔥 EASY</div>
+                        <h3>Heavy Rotation</h3>
+                        <p>Your most-played tracks from the past 4 weeks. Songs you know inside out.</p>
+                    </div>
+                    <div class="mode-card" data-mode="medium">
+                        <div class="mode-badge medium">⚡ MEDIUM</div>
+                        <h3>Familiar Favorites</h3>
+                        <p>Your regular rotation over the past 6 months + recent favorites.</p>
+                    </div>
+                    <div class="mode-card" data-mode="hard">
+                        <div class="mode-badge hard">💀 HARD</div>
+                        <h3>All-Time Deep Cuts</h3>
+                        <p>Archive favorites & older saved tracks you haven't heard in ages.</p>
+                    </div>
+                    <div class="mode-card" data-mode="liked">
+                        <div class="mode-badge liked">❤️ LIBRARY</div>
+                        <h3>Liked Songs</h3>
+                        <p>Randomly selected from your full Spotify Liked Songs collection.</p>
+                    </div>
+                </div>
+
+                <h4 class="section-title">Your Custom Spotify Playlists</h4>
+                <div class="playlists-grid" id="user-playlists-grid">
+                    <div class="empty-playlists-note">Connect your Spotify account to play with any of your custom playlists!</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- STATS MODAL -->
+    <div id="modal-stats" class="modal-overlay hidden">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h2>Your Statistics</h2>
+                <button class="modal-close-btn" data-modal="modal-stats">&times;</button>
+            </div>
+            
+            <div class="stats-overview">
+                <div class="stat-box">
+                    <span class="stat-num" id="stat-played">0</span>
+                    <span class="stat-label">Played</span>
+                </div>
+                <div class="stat-box">
+                    <span class="stat-num" id="stat-winrate">0%</span>
+                    <span class="stat-label">Win %</span>
+                </div>
+                <div class="stat-box">
+                    <span class="stat-num" id="stat-streak">0</span>
+                    <span class="stat-label">Current Streak</span>
+                </div>
+                <div class="stat-box">
+                    <span class="stat-num" id="stat-best-streak">0</span>
+                    <span class="stat-label">Best Streak</span>
+                </div>
+            </div>
+
+            <h4 class="section-title">Guess Time Distribution</h4>
+            <div class="chart-container" id="stats-distribution-chart">
+                <!-- Dynamic bars -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast hidden">Copied score to clipboard!</div>
+
+    <script src="audio_player.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

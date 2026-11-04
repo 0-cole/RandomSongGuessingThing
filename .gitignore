@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+
+# Game & Spotify Cache / Secrets
+session_cache.json
+game_stats.json
+audio_cache/
+
+# OS files
+.DS_Store
+Thumbs.db
