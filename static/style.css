@@ -84,7 +84,6 @@ body {
     font-weight: 600;
     letter-spacing: 0.06em;
     opacity: 0.92;
-    letter-spacing: 0.04em;
     display: flex;
     align-items: center;
     gap: 6px;
@@ -596,7 +595,11 @@ kbd {
 }
 
 .modal-wide {
-    max-width: 580px;
+    max-width: 720px;
+    width: 95%;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
 }
 
 .modal-header {
@@ -734,9 +737,18 @@ kbd {
 
 /* Playlists & Difficulty Modal */
 .modal-body-scroll {
-    max-height: 480px;
+    max-height: 75vh;
     overflow-y: auto;
-    padding-right: 6px;
+    overflow-x: hidden;
+    padding-right: 0px;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+.modal-body-scroll::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
 }
 
 .section-title {
@@ -801,8 +813,10 @@ kbd {
 
 .playlists-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
     gap: 12px;
+    width: 100%;
+    overflow-x: hidden;
 }
 
 .playlist-card {
@@ -1109,4 +1123,17 @@ kbd {
     pointer-events: none;
     user-select: none;
     z-index: 100;
+}
+
+
+/* Clean frameless aesthetic: hide scrollbars globally while retaining scroll */
+::-webkit-scrollbar {
+    width: 0px;
+    height: 0px;
+    display: none;
+}
+
+* {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
 }
