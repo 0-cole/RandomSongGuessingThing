@@ -562,9 +562,7 @@ document.addEventListener("DOMContentLoaded", () => {
             });
             const data = await res.json();
             if (!res.ok || data.success === false) {
-                alert((data.error || `Could not load songs for "${name}".`) + "
-
-Tip: Connect to cellular hotspot or VPN so Spotify API endpoints aren't blocked by the school firewall!");
+                alert((data.error || `Could not load songs for "${name}".`) + "\n\nTip: Connect to cellular hotspot or VPN so Spotify API endpoints aren't blocked by the school firewall!");
                 return;
             }
             closeModals();
