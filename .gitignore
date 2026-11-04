@@ -12,6 +12,11 @@ venv/
 session_cache.json
 game_stats.json
 audio_cache/
+.profile/
+
+# Binaries & Logs
+spotifast/
+*.log
 
 # OS files
 .DS_Store

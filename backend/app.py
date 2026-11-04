@@ -7,6 +7,8 @@ from backend.game_engine import GameEngine
 
 STATIC_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
 
+__version__ = '1.0.1'
+
 app = Flask(__name__, static_folder=STATIC_DIR)
 
 # Instantiate singletons
@@ -31,6 +33,7 @@ def serve_static(filename):
 def get_status():
     status_data = spotify_mgr.get_status()
     status_data["game_stats"] = game_engine.stats
+    status_data["version"] = __version__
     status_data["active_pool"] = {
         "mode": game_engine.difficulty,
         "name": game_engine.playlist_name,

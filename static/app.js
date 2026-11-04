@@ -123,12 +123,22 @@ document.addEventListener("DOMContentLoaded", () => {
         await refreshStatus();
         await loadGameState();
         setupEventListeners();
+        setInterval(refreshStatus, 3000);
     }
 
     async function refreshStatus() {
         try {
             const res = await fetch("/api/status");
             const data = await res.json();
+
+            if (data.version) {
+                if (window.__CURRENT_APP_VERSION__ && window.__CURRENT_APP_VERSION__ !== data.version) {
+                    console.log("New app version detected, reloading...");
+                    window.location.reload();
+                    return;
+                }
+                window.__CURRENT_APP_VERSION__ = data.version;
+            }
             
             // Update auth status
             if (data.connected) {
@@ -631,6 +641,15 @@ document.addEventListener("DOMContentLoaded", () => {
         try {
             const res = await fetch("/api/status");
             const data = await res.json();
+
+            if (data.version) {
+                if (window.__CURRENT_APP_VERSION__ && window.__CURRENT_APP_VERSION__ !== data.version) {
+                    console.log("New app version detected, reloading...");
+                    window.location.reload();
+                    return;
+                }
+                window.__CURRENT_APP_VERSION__ = data.version;
+            }
             const stats = data.game_stats || {};
 
             document.getElementById("stat-played").textContent = stats.played || 0;

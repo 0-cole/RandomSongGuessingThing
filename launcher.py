@@ -46,31 +46,34 @@ def main():
     print("======================================================")
     print(f"Starting local server at {URL}...")
 
-    # Start Flask server
-    from backend.app import app
-    import threading
+    # Start Flask server if not already running
+    if not is_port_open(PORT):
+        from backend.app import app
+        import threading
 
-    server_thread = threading.Thread(
-        target=lambda: app.run(host="127.0.0.1", port=PORT, debug=False, use_reloader=False),
-        daemon=True
-    )
-    server_thread.start()
+        server_thread = threading.Thread(
+            target=lambda: app.run(host="127.0.0.1", port=PORT, debug=False, use_reloader=False),
+            daemon=True
+        )
+        server_thread.start()
 
-    # Wait for server to come online
-    retries = 30
-    while retries > 0 and not is_port_open(PORT):
-        time.sleep(0.3)
-        retries -= 1
+        # Wait for server to come online
+        retries = 30
+        while retries > 0 and not is_port_open(PORT):
+            time.sleep(0.3)
+            retries -= 1
 
     print("Server online! Opening standalone desktop window...")
     browser_exe = find_browser_app_executable()
 
     if browser_exe:
         print(f"Launching via {os.path.basename(browser_exe)} in app mode...")
+        profile_dir = os.path.join(base_dir, ".profile")
         cmd = [
             browser_exe,
             f"--app={URL}",
-            "--window-size=660,880",
+            f"--user-data-dir={profile_dir}",
+            "--window-size=740,940",
             "--window-position=300,100"
         ]
         try:
