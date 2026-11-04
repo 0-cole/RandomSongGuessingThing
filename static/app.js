@@ -186,6 +186,7 @@ document.addEventListener("DOMContentLoaded", () => {
         showSpinner(true);
         audio.loadTrack(state.round_id).then((ok) => {
             showSpinner(false);
+            if (!ok) { startNewRound(); }
         });
 
         // Update labels

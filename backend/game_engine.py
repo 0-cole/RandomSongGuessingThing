@@ -12,44 +12,22 @@ SNIPPET_STAGES = [0.1, 0.25, 0.5, 1.0, 2.0, 5.0]
 # Sample tracks for Guest / Offline demo mode
 DEMO_TRACKS = [
     {
-        "id": "demo_1",
+        "id": "0VjIjW4GlUZAMYd2vXMi3b",
+        "uri": "spotify:track:0VjIjW4GlUZAMYd2vXMi3b",
         "name": "Blinding Lights",
         "artist": "The Weeknd",
         "album_name": "After Hours",
-        "image_url": "https://is1-ssl.mzstatic.com/image/thumb/Music115/v4/4b/58/e3/4b58e390-3fb2-094e-28db-002d9bb93077/19UMGIM86282.rgb.jpg/600x600bb.jpg",
-        "thumbnail_url": "https://is1-ssl.mzstatic.com/image/thumb/Music115/v4/4b/58/e3/4b58e390-3fb2-094e-28db-002d9bb93077/19UMGIM86282.rgb.jpg/100x100bb.jpg"
+        "image_url": "https://i.scdn.co/image/ab67616d0000b2738863bc11d2aa12b54f5aeb36",
+        "thumbnail_url": "https://i.scdn.co/image/ab67616d000048518863bc11d2aa12b54f5aeb36"
     },
     {
-        "id": "demo_2",
-        "name": "Stay // Honestly",
-        "artist": "Ax and the Hatchetmen",
-        "album_name": "Stay // Honestly",
-        "image_url": "https://is1-ssl.mzstatic.com/image/thumb/Music122/v4/bf/16/be/bf16be02-ea79-9942-5f60-93cb18eecdbb/859765882628_cover.jpg/600x600bb.jpg",
-        "thumbnail_url": "https://is1-ssl.mzstatic.com/image/thumb/Music122/v4/bf/16/be/bf16be02-ea79-9942-5f60-93cb18eecdbb/859765882628_cover.jpg/100x100bb.jpg"
-    },
-    {
-        "id": "demo_3",
-        "name": "Everybody Talks",
-        "artist": "Ax and the Hatchetmen",
-        "album_name": "Everybody Talks",
-        "image_url": "https://is1-ssl.mzstatic.com/image/thumb/Music126/v4/21/20/df/2120df05-59b6-81cf-0544-245455c11099/859775084999_cover.jpg/600x600bb.jpg",
-        "thumbnail_url": "https://is1-ssl.mzstatic.com/image/thumb/Music126/v4/21/20/df/2120df05-59b6-81cf-0544-245455c11099/859775084999_cover.jpg/100x100bb.jpg"
-    },
-    {
-        "id": "demo_4",
-        "name": "Hotel Room",
-        "artist": "Ax and the Hatchetmen",
-        "album_name": "Hotel Room",
-        "image_url": "https://is1-ssl.mzstatic.com/image/thumb/Music116/v4/18/76/78/18767858-da39-d3e7-c6b7-4a0b3f8857a2/859784381041_cover.jpg/600x600bb.jpg",
-        "thumbnail_url": "https://is1-ssl.mzstatic.com/image/thumb/Music116/v4/18/76/78/18767858-da39-d3e7-c6b7-4a0b3f8857a2/859784381041_cover.jpg/100x100bb.jpg"
-    },
-    {
-        "id": "demo_5",
+        "id": "7MXVkk9YMctZqd1Srtv4MB",
+        "uri": "spotify:track:7MXVkk9YMctZqd1Srtv4MB",
         "name": "Starboy",
         "artist": "The Weeknd, Daft Punk",
         "album_name": "Starboy",
-        "image_url": "https://is1-ssl.mzstatic.com/image/thumb/Music125/v4/e5/a0/0a/e5a00a40-3ef9-813c-0e78-c7746408bb39/16UMGIM53641.rgb.jpg/600x600bb.jpg",
-        "thumbnail_url": "https://is1-ssl.mzstatic.com/image/thumb/Music125/v4/e5/a0/0a/e5a00a40-3ef9-813c-0e78-c7746408bb39/16UMGIM53641.rgb.jpg/100x100bb.jpg"
+        "image_url": "https://i.scdn.co/image/ab67616d0000b2734718e2b124f79258be7bc452",
+        "thumbnail_url": "https://i.scdn.co/image/ab67616d000048514718e2b124f79258be7bc452"
     }
 ]
 
