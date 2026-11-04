@@ -565,6 +565,45 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     });
 
+    const btnOAuthLogin = document.getElementById("btn-oauth-login");
+    const oauthStatusText = document.getElementById("oauth-status-text");
+
+    if (btnOAuthLogin) {
+        btnOAuthLogin.addEventListener("click", async () => {
+            btnOAuthLogin.disabled = true;
+            oauthStatusText.textContent = "Opening Spotify in your browser...";
+            try {
+                const res = await fetch("/api/auth/oauth_start", { method: "POST" });
+                const data = await res.json();
+                if (data.success && data.auth_url) {
+                    window.open(data.auth_url, "_blank");
+                    oauthStatusText.textContent = "Waiting for you to click 'Agree' in Spotify...";
+
+                    if (authPollingInterval) clearInterval(authPollingInterval);
+                    authPollingInterval = setInterval(async () => {
+                        const sRes = await fetch("/api/status");
+                        const sData = await sRes.json();
+                        if (sData.connected) {
+                            clearInterval(authPollingInterval);
+                            oauthStatusText.textContent = "Connected successfully!";
+                            await refreshStatus();
+                            await loadGameState();
+                            closeModals();
+                            showToast("Connected to Spotify!");
+                            btnOAuthLogin.disabled = false;
+                        }
+                    }, 1200);
+                } else {
+                    oauthStatusText.textContent = "Could not start authorization flow.";
+                    btnOAuthLogin.disabled = false;
+                }
+            } catch (err) {
+                oauthStatusText.textContent = "Connection error: " + err;
+                btnOAuthLogin.disabled = false;
+            }
+        });
+    }
+
     btnStartZeroconf.addEventListener("click", async () => {
         zcBtnText.textContent = "Advertising 'Songless Guessing Game'...";
         btnStartZeroconf.disabled = true;

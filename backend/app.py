@@ -7,7 +7,7 @@ from backend.game_engine import GameEngine
 
 STATIC_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
 
-__version__ = '1.0.1'
+__version__ = '1.0.2'
 
 app = Flask(__name__, static_folder=STATIC_DIR)
 
@@ -32,6 +32,11 @@ def serve_static(filename):
 @app.route("/api/status", methods=["GET"])
 def get_status():
     status_data = spotify_mgr.get_status()
+    if spotify_mgr.is_connected and game_engine.playlist_name == "Demo / Sample Pack":
+        try:
+            game_engine.load_pool("easy")
+        except Exception:
+            pass
     status_data["game_stats"] = game_engine.stats
     status_data["version"] = __version__
     status_data["active_pool"] = {
@@ -53,6 +58,11 @@ def login_user_pass():
     if result.get("success"):
         # Reload game pool with user's actual top tracks
         game_engine.load_pool(game_engine.difficulty)
+    return jsonify(result)
+
+@app.route("/api/auth/oauth_start", methods=["POST"])
+def oauth_start():
+    result = spotify_mgr.start_oauth_flow()
     return jsonify(result)
 
 @app.route("/api/auth/start_zeroconf", methods=["POST"])

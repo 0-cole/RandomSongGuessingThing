@@ -22,6 +22,10 @@ class SpotifyManager:
         self.is_connected = False
         self.connection_status = "Disconnected"
         self.auth_lock = threading.Lock()
+        self.client_id = "584f1fe365ea49978b2355b8b60404bd"
+        self.refresh_token = None
+        self.oauth_verifier = None
+        self._oauth_httpd = None
         
         # Try loading previously stored session
         self.load_stored_session()
@@ -33,6 +37,22 @@ class SpotifyManager:
         try:
             with open(CACHE_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
+            
+            # Check for OAuth tokens first
+            if "refresh_token" in data:
+                self.refresh_token = data.get("refresh_token")
+                self.cached_token = data.get("access_token")
+                self.token_expiry = data.get("token_expiry", 0)
+                if time.time() >= self.token_expiry:
+                    self._refresh_access_token()
+                if self.cached_token:
+                    self.is_connected = True
+                    self._fetch_user_profile()
+                    name = self.user_profile.get("display_name") if self.user_profile else "Spotify User"
+                    self.connection_status = f"Connected as {name}"
+                    logger.info("Successfully restored OAuth session for %s", name)
+                    return True
+
             stored_str = data.get("stored_session")
             if not stored_str:
                 return False
@@ -53,16 +73,29 @@ class SpotifyManager:
             return False
 
     def save_session_cache(self):
-        """Save the current session's reusable blob string to cache"""
-        if not self.session:
-            return
+        """Save the current session's reusable blob string or OAuth tokens to cache"""
+        data = {}
+        if os.path.exists(CACHE_FILE):
+            try:
+                with open(CACHE_FILE, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+            except Exception:
+                data = {}
+
+        if self.session:
+            try:
+                data["username"] = self.session.username()
+                data["stored_session"] = self.session.stored()
+            except Exception:
+                pass
+
+        if self.refresh_token:
+            data["refresh_token"] = self.refresh_token
+            data["access_token"] = self.cached_token
+            data["token_expiry"] = self.token_expiry
+
+        data["saved_at"] = time.time()
         try:
-            stored_str = self.session.stored()
-            data = {
-                "username": self.session.username(),
-                "stored_session": stored_str,
-                "saved_at": time.time()
-            }
             with open(CACHE_FILE, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2)
             logger.info("Session saved to %s", CACHE_FILE)
@@ -125,6 +158,14 @@ class SpotifyManager:
         if self.cached_token and now < self.token_expiry:
             return self.cached_token
         
+        if self.refresh_token:
+            refreshed = self._refresh_access_token()
+            if refreshed:
+                return refreshed
+
+        if not self.session:
+            return None
+
         try:
             scope = (
                 "user-read-private "
@@ -162,10 +203,12 @@ class SpotifyManager:
 
     def get_status(self) -> Dict[str, Any]:
         """Return current authentication and user profile state"""
+        is_conn = self.is_connected and (self.session is not None or self.cached_token is not None)
+        username = self.session.username() if self.session else (self.user_profile.get("id") if self.user_profile else None)
         return {
-            "connected": self.is_connected and self.session is not None,
+            "connected": is_conn,
             "status": self.connection_status,
-            "username": self.session.username() if self.session else None,
+            "username": username,
             "display_name": self.user_profile.get("display_name") if self.user_profile else None,
             "product": self.user_profile.get("product") if self.user_profile else None,
             "image": self.user_profile.get("images", [{}])[0].get("url") if self.user_profile and self.user_profile.get("images") else None
@@ -325,3 +368,127 @@ class SpotifyManager:
                 os.remove(CACHE_FILE)
             except Exception:
                 pass
+
+    def _refresh_access_token(self) -> Optional[str]:
+        if not self.refresh_token:
+            return None
+        try:
+            res = requests.post(
+                "https://accounts.spotify.com/api/token",
+                data={
+                    "grant_type": "refresh_token",
+                    "refresh_token": self.refresh_token,
+                    "client_id": self.client_id,
+                },
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+                timeout=10
+            )
+            if res.status_code == 200:
+                data = res.json()
+                self.cached_token = data.get("access_token")
+                if data.get("refresh_token"):
+                    self.refresh_token = data.get("refresh_token")
+                self.token_expiry = time.time() + data.get("expires_in", 3600) - 60
+                self.save_session_cache()
+                return self.cached_token
+            else:
+                logger.error("Failed to refresh token: %s %s", res.status_code, res.text)
+                return None
+        except Exception as e:
+            logger.error("Exception refreshing token: %s", e)
+            return None
+
+    def start_oauth_flow(self) -> Dict[str, Any]:
+        import base64
+        import hashlib
+        import urllib.parse
+        from http.server import HTTPServer, BaseHTTPRequestHandler
+
+        verifier = base64.urlsafe_b64encode(os.urandom(32)).rstrip(b'=').decode()
+        challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b'=').decode()
+        self.oauth_verifier = verifier
+
+        redirect_uri = "http://127.0.0.1:8989/login"
+        scopes = "user-read-private user-read-email user-top-read user-library-read playlist-read-private playlist-read-collaborative user-read-recently-played"
+        
+        params = {
+            "client_id": self.client_id,
+            "response_type": "code",
+            "redirect_uri": redirect_uri,
+            "code_challenge_method": "S256",
+            "code_challenge": challenge,
+            "scope": scopes
+        }
+        auth_url = "https://accounts.spotify.com/authorize?" + urllib.parse.urlencode(params)
+
+        manager = self
+        class OAuthCallbackHandler(BaseHTTPRequestHandler):
+            def log_message(self, format, *args):
+                pass
+
+            def do_GET(self):
+                parsed = urllib.parse.urlparse(self.path)
+                if parsed.path == "/login":
+                    qs = urllib.parse.parse_qs(parsed.query)
+                    code = qs.get("code", [None])[0]
+                    if code:
+                        token_res = requests.post(
+                            "https://accounts.spotify.com/api/token",
+                            data={
+                                "grant_type": "authorization_code",
+                                "code": code,
+                                "redirect_uri": redirect_uri,
+                                "client_id": manager.client_id,
+                                "code_verifier": manager.oauth_verifier
+                            },
+                            headers={"Content-Type": "application/x-www-form-urlencoded"},
+                            timeout=10
+                        )
+                        if token_res.status_code == 200:
+                            t_data = token_res.json()
+                            manager.cached_token = t_data.get("access_token")
+                            manager.refresh_token = t_data.get("refresh_token")
+                            manager.token_expiry = time.time() + t_data.get("expires_in", 3600) - 60
+                            manager.is_connected = True
+                            manager.save_session_cache()
+                            manager._fetch_user_profile()
+                            name = manager.user_profile.get("display_name") if manager.user_profile else "Spotify User"
+                            manager.connection_status = f"Connected as {name}"
+                            
+                            html = """<!DOCTYPE html>
+<html>
+<head><title>Spotiless Connected</title></head>
+<body style="background:#121314;color:#f0f2f5;font-family:sans-serif;text-align:center;padding:60px 20px;">
+  <h1 style="color:#1db954;font-size:2rem;margin-bottom:12px;">Successfully Connected to Spotify!</h1>
+  <p style="color:#8e969d;font-size:1.1rem;">You can close this tab and return to Spotiless.</p>
+  <script>setTimeout(function() { window.close(); }, 1500);</script>
+</body>
+</html>"""
+                            self.send_response(200)
+                            self.send_header("Content-Type", "text/html; charset=utf-8")
+                            self.end_headers()
+                            self.wfile.write(html.encode("utf-8"))
+                            threading.Thread(target=self.server.shutdown, daemon=True).start()
+                            return
+
+                self.send_response(400)
+                self.end_headers()
+                self.wfile.write(b"Spotify login failed or code missing.")
+
+        if hasattr(self, "_oauth_httpd") and self._oauth_httpd:
+            try:
+                self._oauth_httpd.shutdown()
+                self._oauth_httpd.server_close()
+            except Exception:
+                pass
+
+        try:
+            httpd = HTTPServer(("127.0.0.1", 8989), OAuthCallbackHandler)
+            self._oauth_httpd = httpd
+            threading.Thread(target=httpd.serve_forever, daemon=True).start()
+            logger.info("OAuth redirect listener started on http://127.0.0.1:8989/login")
+        except Exception as e:
+            logger.warning("Could not bind 8989 for OAuth redirect: %s", e)
+
+        return {"success": True, "auth_url": auth_url}
+
