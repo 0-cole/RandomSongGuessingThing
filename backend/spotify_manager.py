@@ -38,7 +38,7 @@ def _apply_librespot_patches():
             while len(buf) < length:
                 chunk = sock.recv(length - len(buf))
                 if not chunk:
-                    raise EOFError("Socket closed during Shannon packet read")
+                    raise ConnectionResetError("Socket closed during Shannon packet read")
                 buf.extend(chunk)
             return bytes(buf)
 
@@ -53,14 +53,17 @@ def _apply_librespot_patches():
                     timeout=3,
                 )
                 if res.status_code == 200:
-                    return res.json()
+                    data = res.json()
+                    aps = [ap for ap in data.get("accesspoint", []) if ap.endswith(":4070")]
+                    if aps:
+                        data["accesspoint"] = aps
+                        return data
             except Exception:
                 pass
             return {
                 "accesspoint": [
                     "ap-gae2.spotify.com:4070",
-                    "ap-gae2.spotify.com:443",
-                    "ap-gae2.spotify.com:80",
+                    "ap-guc3.spotify.com:4070",
                 ],
                 "dealer": ["gae2-dealer.spotify.com:443"],
                 "spclient": ["gae2-spclient.spotify.com:443"],
