@@ -7,7 +7,7 @@ from backend.game_engine import GameEngine
 
 STATIC_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
 
-__version__ = '1.0.8'
+__version__ = '1.0.9'
 
 app = Flask(__name__, static_folder=STATIC_DIR)
 
@@ -42,6 +42,7 @@ def get_status():
     status_data["active_pool"] = {
         "mode": game_engine.difficulty,
         "name": game_engine.playlist_name,
+        "playlist_ids": game_engine.playlist_ids,
         "total_tracks": len(game_engine.track_pool)
     }
     return jsonify(status_data)
@@ -140,8 +141,16 @@ def set_game_pool():
     mode = data.get("mode", "easy")
     playlist_id = data.get("playlist_id")
     playlist_name = data.get("playlist_name", "")
+    playlist_ids = data.get("playlist_ids")
+    playlist_names = data.get("playlist_names")
     
-    result = game_engine.load_pool(mode=mode, playlist_id=playlist_id, playlist_name=playlist_name)
+    result = game_engine.load_pool(
+        mode=mode,
+        playlist_id=playlist_id,
+        playlist_name=playlist_name,
+        playlist_ids=playlist_ids,
+        playlist_names=playlist_names,
+    )
     if not result.get("success"):
         return jsonify({"success": False, "error": result.get("error")}), 400
     # Automatically kick off a fresh round in the new mode

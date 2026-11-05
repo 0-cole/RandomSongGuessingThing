@@ -268,7 +268,13 @@
                 </div>
 
                 <!-- Your Created Playlists -->
-                <h4 class="section-title">Your Created Playlists (Only Yours)</h4>
+                <div class="section-header-row">
+                    <div>
+                        <h4 class="section-title" style="margin-bottom: 2px;">Your Created Playlists (Only Yours)</h4>
+                        <p class="section-subtitle-hint">Click multiple playlists to combine them • Double-click to play one instantly</p>
+                    </div>
+                    <button id="btn-select-all-playlists" class="btn btn-secondary btn-xs">Select All</button>
+                </div>
                 <div class="playlists-grid" id="user-playlists-grid">
                     <div class="empty-playlists-note">Loading your created playlists...</div>
                 </div>
@@ -276,6 +282,21 @@
                 <!-- Spotify Categories & Whole Catalog -->
                 <h4 class="section-title" style="margin-top: 24px;">Popular Spotify Playlists & Genres</h4>
                 <div class="playlists-grid" id="curated-playlists-grid"></div>
+            </div>
+
+            <!-- Multi-Playlist Selection Footer Bar -->
+            <div id="multi-playlist-bar" class="multi-playlist-bar hidden">
+                <div class="mp-summary">
+                    <span class="mp-count-badge" id="mp-count-badge">0</span>
+                    <div class="mp-text-col">
+                        <span class="mp-label">Combined Playlist Pool</span>
+                        <span class="mp-names" id="mp-selected-names">No playlists selected</span>
+                    </div>
+                </div>
+                <div class="mp-actions">
+                    <button id="btn-clear-playlists" class="btn btn-secondary btn-sm">Clear</button>
+                    <button id="btn-play-playlists" class="btn btn-primary btn-glow btn-sm">Play Selected &rarr;</button>
+                </div>
             </div>
         </div>
     </div>

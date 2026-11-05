@@ -838,6 +838,126 @@ kbd {
 
 .playlist-card.selected {
     border-color: var(--color-spotify);
+    background: rgba(29, 185, 84, 0.14);
+    box-shadow: 0 0 0 1px rgba(29, 185, 84, 0.35);
+}
+
+.playlist-card .p-check {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 1.5px solid var(--border-highlight);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 900;
+    color: transparent;
+    flex-shrink: 0;
+    transition: all 0.18s ease;
+}
+
+.playlist-card.selected .p-check {
+    background: var(--color-spotify);
+    border-color: var(--color-spotify);
+    color: #000;
+}
+
+.section-header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 10px;
+}
+
+.section-subtitle-hint {
+    font-size: 0.74rem;
+    color: var(--color-text-subtle);
+    margin: 0;
+}
+
+.btn-xs {
+    height: 30px;
+    padding: 0 12px;
+    font-size: 0.76rem;
+    font-weight: 700;
+    border-radius: var(--radius-sm);
+    white-space: nowrap;
+}
+
+.btn-sm {
+    height: 38px;
+    padding: 0 16px;
+    font-size: 0.84rem;
+    font-weight: 800;
+    border-radius: var(--radius-sm);
+    white-space: nowrap;
+}
+
+.multi-playlist-bar {
+    margin-top: 16px;
+    padding: 12px 16px;
+    background: var(--bg-surface-elevated);
+    border: 1px solid rgba(29, 185, 84, 0.45);
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+}
+
+.mp-summary {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    flex: 1;
+}
+
+.mp-count-badge {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--color-spotify);
+    color: #000;
+    font-weight: 900;
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.mp-text-col {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.mp-label {
+    font-size: 0.7rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--color-spotify);
+}
+
+.mp-names {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--color-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.mp-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
 }
 
 .playlist-card img {

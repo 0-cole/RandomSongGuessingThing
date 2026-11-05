@@ -475,13 +475,88 @@ document.addEventListener("DOMContentLoaded", () => {
     btnNextSong.addEventListener("click", startNextRound);
 
     // ----------------- Playlist / Difficulty Modal -----------------
+    const selectedPlaylists = new Map(); // id -> name
+    let cachedUserPlaylists = [];
+    const multiPlaylistBar = document.getElementById("multi-playlist-bar");
+    const mpCountBadge = document.getElementById("mp-count-badge");
+    const mpSelectedNames = document.getElementById("mp-selected-names");
+    const btnClearPlaylists = document.getElementById("btn-clear-playlists");
+    const btnPlayPlaylists = document.getElementById("btn-play-playlists");
+    const btnSelectAllPlaylists = document.getElementById("btn-select-all-playlists");
+
+    function updateMultiPlaylistBar() {
+        const count = selectedPlaylists.size;
+        document.querySelectorAll(".playlist-card[data-playlist-id]").forEach(card => {
+            const pid = card.getAttribute("data-playlist-id");
+            card.classList.toggle("selected", selectedPlaylists.has(pid));
+        });
+        if (btnSelectAllPlaylists && cachedUserPlaylists.length > 0) {
+            const allSelected = cachedUserPlaylists.every(p => selectedPlaylists.has(p.id));
+            btnSelectAllPlaylists.textContent = allSelected ? "Deselect All" : "Select All";
+        }
+        if (!multiPlaylistBar) return;
+        if (count === 0) {
+            multiPlaylistBar.classList.add("hidden");
+        } else {
+            multiPlaylistBar.classList.remove("hidden");
+            if (mpCountBadge) mpCountBadge.textContent = String(count);
+            const names = Array.from(selectedPlaylists.values());
+            if (mpSelectedNames) mpSelectedNames.textContent = names.join(" + ");
+            if (btnPlayPlaylists) {
+                btnPlayPlaylists.innerHTML = count === 1
+                    ? `Play "${names[0]}" &rarr;`
+                    : `Play ${count} Playlists &rarr;`;
+            }
+        }
+    }
+
+    function togglePlaylistSelection(id, name) {
+        if (selectedPlaylists.has(id)) {
+            selectedPlaylists.delete(id);
+        } else {
+            selectedPlaylists.set(id, name);
+            difficultyCards.forEach(c => c.classList.remove("selected"));
+        }
+        updateMultiPlaylistBar();
+    }
+
+    if (btnClearPlaylists) {
+        btnClearPlaylists.addEventListener("click", () => {
+            selectedPlaylists.clear();
+            updateMultiPlaylistBar();
+        });
+    }
+
+    if (btnSelectAllPlaylists) {
+        btnSelectAllPlaylists.addEventListener("click", () => {
+            if (!cachedUserPlaylists.length) return;
+            const allSelected = cachedUserPlaylists.every(p => selectedPlaylists.has(p.id));
+            if (allSelected) {
+                cachedUserPlaylists.forEach(p => selectedPlaylists.delete(p.id));
+            } else {
+                cachedUserPlaylists.forEach(p => selectedPlaylists.set(p.id, p.name));
+                difficultyCards.forEach(c => c.classList.remove("selected"));
+            }
+            updateMultiPlaylistBar();
+        });
+    }
+
+    if (btnPlayPlaylists) {
+        btnPlayPlaylists.addEventListener("click", () => {
+            if (selectedPlaylists.size === 0) return;
+            playSelectedPlaylists();
+        });
+    }
+
     async function openModeModal() {
         modalMode.classList.remove("hidden");
         try {
             const res = await fetch("/api/playlists");
             const data = await res.json();
-            renderUserPlaylists(data.my_playlists || data.playlists || []);
+            cachedUserPlaylists = data.my_playlists || data.playlists || [];
+            renderUserPlaylists(cachedUserPlaylists);
             renderCuratedPlaylists(data.curated_playlists || []);
+            updateMultiPlaylistBar();
         } catch (err) {
             console.error("Error fetching playlists:", err);
         }
@@ -490,6 +565,8 @@ document.addEventListener("DOMContentLoaded", () => {
     difficultyCards.forEach(card => {
         card.addEventListener("click", async () => {
             const mode = card.dataset.mode;
+            selectedPlaylists.clear();
+            updateMultiPlaylistBar();
             difficultyCards.forEach(c => c.classList.remove("selected"));
             card.classList.add("selected");
 
@@ -521,15 +598,23 @@ document.addEventListener("DOMContentLoaded", () => {
 
         playlists.forEach(p => {
             const card = document.createElement("div");
-            card.className = "playlist-card";
+            card.className = "playlist-card" + (selectedPlaylists.has(p.id) ? " selected" : "");
+            card.setAttribute("data-playlist-id", p.id);
             card.innerHTML = `
                 <img src="${p.image || ''}" alt="Cover">
                 <div class="p-info">
                     <div class="p-title">${p.name}</div>
                     <div class="p-count">${p.tracks_count} tracks • By you</div>
                 </div>
+                <div class="p-check">✓</div>
             `;
-            card.addEventListener("click", () => selectPlaylist(p.id, p.name));
+            card.addEventListener("click", () => togglePlaylistSelection(p.id, p.name));
+            card.addEventListener("dblclick", () => {
+                selectedPlaylists.clear();
+                selectedPlaylists.set(p.id, p.name);
+                updateMultiPlaylistBar();
+                playSelectedPlaylists();
+            });
             userPlaylistsGrid.appendChild(card);
         });
     }
@@ -540,42 +625,68 @@ document.addEventListener("DOMContentLoaded", () => {
         grid.innerHTML = "";
         curated.forEach(p => {
             const card = document.createElement("div");
-            card.className = "playlist-card";
+            card.className = "playlist-card" + (selectedPlaylists.has(p.id) ? " selected" : "");
+            card.setAttribute("data-playlist-id", p.id);
             card.innerHTML = `
                 <img src="${p.image || ''}" alt="Cover">
                 <div class="p-info">
                     <div class="p-title">${p.name}</div>
                     <div class="p-count">${p.desc}</div>
                 </div>
+                <div class="p-check">✓</div>
             `;
-            card.addEventListener("click", () => selectPlaylist(p.id, p.name));
+            card.addEventListener("click", () => togglePlaylistSelection(p.id, p.name));
+            card.addEventListener("dblclick", () => {
+                selectedPlaylists.clear();
+                selectedPlaylists.set(p.id, p.name);
+                updateMultiPlaylistBar();
+                playSelectedPlaylists();
+            });
             grid.appendChild(card);
         });
     }
 
-    async function selectPlaylist(id, name) {
+    async function playSelectedPlaylists() {
+        const ids = Array.from(selectedPlaylists.keys());
+        const names = Array.from(selectedPlaylists.values());
+        if (!ids.length) return;
         showSpinner(true);
         try {
             const res = await fetch("/api/game/pool", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ mode: "playlist", playlist_id: id, playlist_name: name })
+                body: JSON.stringify({
+                    mode: "playlist",
+                    playlist_id: ids[0],
+                    playlist_name: names[0],
+                    playlist_ids: ids,
+                    playlist_names: names
+                })
             });
             const data = await res.json();
             if (!res.ok || data.success === false) {
-                alert((data.error || `Could not load songs for "${name}".`) + "\n\nTip: Connect to cellular hotspot or VPN so Spotify API endpoints aren't blocked by the school firewall!");
+                alert(data.error || "Could not load songs for the selected playlists.");
                 return;
             }
             closeModals();
             applyGameState(data.round);
             refreshStatus();
-            showToast(`Playing from "${name}"!`);
+            const label = data.pool && data.pool.playlist_name ? data.pool.playlist_name : names.join(" + ");
+            const total = data.pool && data.pool.total_tracks ? ` (${data.pool.total_tracks} songs)` : "";
+            showToast(`Playing from ${label}${total}!`);
         } catch (err) {
-            console.error("Failed to select playlist:", err);
-            alert("Error loading playlist: " + err);
+            console.error("Failed to load selected playlists:", err);
+            alert("Error loading playlists: " + err);
         } finally {
             showSpinner(false);
         }
+    }
+
+    async function selectPlaylist(id, name) {
+        selectedPlaylists.clear();
+        selectedPlaylists.set(id, name);
+        updateMultiPlaylistBar();
+        await playSelectedPlaylists();
     }
 
     const btnLoadCustom = document.getElementById("btn-load-custom-playlist");

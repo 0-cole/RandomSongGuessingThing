@@ -39,6 +39,8 @@ class GameEngine:
         # Active session state
         self.difficulty = "easy"
         self.playlist_id = None
+        self.playlist_ids: List[str] = []
+        self.playlist_names: List[str] = []
         self.playlist_name = ""
         self.track_pool: List[Dict[str, Any]] = []
         self.played_track_ids: set[str] = set()
@@ -75,17 +77,41 @@ class GameEngine:
         except Exception:
             pass
 
-    def load_pool(self, mode: str = "easy", playlist_id: Optional[str] = None, playlist_name: str = "") -> Dict[str, Any]:
+    def load_pool(
+        self,
+        mode: str = "easy",
+        playlist_id: Optional[str] = None,
+        playlist_name: str = "",
+        playlist_ids: Optional[List[str]] = None,
+        playlist_names: Optional[List[str]] = None,
+    ) -> Dict[str, Any]:
         """
         Load tracks based on mode:
         - 'easy': Top tracks (past 4 weeks) - Heavy rotation
         - 'medium': Top tracks (past 6 months) + Liked songs
         - 'hard': Top tracks (all time) - Deep cuts
-        - 'playlist': Specific user playlist
+        - 'playlist': One or more user/curated playlists combined
         """
         self.difficulty = mode
-        self.playlist_id = playlist_id
-        self.playlist_name = playlist_name
+        if mode == "playlist":
+            ids = [pid for pid in (playlist_ids or ([playlist_id] if playlist_id else [])) if pid]
+            names = [n for n in (playlist_names or ([playlist_name] if playlist_name else [])) if n]
+            self.playlist_ids = ids
+            self.playlist_names = names
+            self.playlist_id = ids[0] if ids else None
+            if len(names) == 1:
+                self.playlist_name = names[0]
+            elif len(names) == 2:
+                self.playlist_name = f"{names[0]} + {names[1]}"
+            elif len(names) > 2:
+                self.playlist_name = f"{names[0]} + {len(names) - 1} more"
+            else:
+                self.playlist_name = playlist_name or (f"{len(ids)} Playlists" if len(ids) > 1 else f"Playlist {self.playlist_id}")
+        else:
+            self.playlist_id = None
+            self.playlist_ids = []
+            self.playlist_names = []
+            self.playlist_name = playlist_name
         
         tracks = []
         if not self.spotify_mgr or not self.spotify_mgr.is_connected:
@@ -108,10 +134,15 @@ class GameEngine:
                 if not tracks:
                     tracks = self.spotify_mgr.fetch_liked_songs(limit=50)
                 self.playlist_name = "All-Time Deep Cuts"
-            elif mode == "playlist" and playlist_id:
-                tracks = self.spotify_mgr.fetch_playlist_tracks(playlist_id, limit=100)
-                if not self.playlist_name:
-                    self.playlist_name = f"Playlist {playlist_id}"
+            elif mode == "playlist" and self.playlist_ids:
+                seen_ids = set()
+                for pid in self.playlist_ids:
+                    p_tracks = self.spotify_mgr.fetch_playlist_tracks(pid, limit=150)
+                    for t in (p_tracks or []):
+                        tid = t.get("id")
+                        if tid and tid not in seen_ids:
+                            seen_ids.add(tid)
+                            tracks.append(t)
             elif mode == "liked":
                 tracks = self.spotify_mgr.fetch_liked_songs(limit=50)
                 self.playlist_name = "Liked Songs"
@@ -140,13 +171,14 @@ class GameEngine:
             "success": True,
             "mode": mode,
             "playlist_name": self.playlist_name,
+            "playlist_ids": self.playlist_ids,
             "total_tracks": len(self.track_pool)
         }
 
     def start_new_round(self) -> Dict[str, Any]:
         """Start a new guessing round with an unplayed song from the current pool"""
         if not self.track_pool:
-            self.load_pool(self.difficulty, self.playlist_id, self.playlist_name)
+            self.load_pool(self.difficulty, self.playlist_id, self.playlist_name, self.playlist_ids, self.playlist_names)
             
         available = [t for t in self.track_pool if t["id"] not in self.played_track_ids]
         if not available:
@@ -182,6 +214,7 @@ class GameEngine:
             "is_won": self.is_won,
             "is_over": self.is_over,
             "pool_name": self.playlist_name,
+            "playlist_ids": self.playlist_ids,
             "pool_size": len(self.track_pool),
             "stats": self.stats
         }
