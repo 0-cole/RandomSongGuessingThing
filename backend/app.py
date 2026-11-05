@@ -27,6 +27,13 @@ def index():
 def serve_static(filename):
     return send_from_directory(STATIC_DIR, filename)
 
+@app.after_request
+def add_cache_control(response):
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
+
 # ----------------- Auth & Status Endpoints -----------------
 
 @app.route("/api/status", methods=["GET"])
