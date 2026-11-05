@@ -33,6 +33,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const authStatusDot = document.getElementById("auth-status-dot");
     const authUsernameLabel = document.getElementById("auth-username-label");
     const toast = document.getElementById("toast");
+    const btnThemeToggle = document.getElementById("btn-theme-toggle");
+    const iconThemeSun = document.getElementById("icon-theme-sun");
+    const iconThemeMoon = document.getElementById("icon-theme-moon");
 
     // Modals
     const modalReveal = document.getElementById("modal-reveal");
@@ -130,7 +133,42 @@ document.addEventListener("DOMContentLoaded", () => {
     drawVisualizer();
 
     // ----------------- Initialization -----------------
+    // ----------------- Theme Management -----------------
+    function initTheme() {
+        const savedTheme = localStorage.getItem("spotiless_theme") || "dark";
+        applyTheme(savedTheme);
+    }
+
+    function applyTheme(theme) {
+        if (theme === "light") {
+            document.body.classList.remove("dark-theme");
+            document.body.classList.add("light-theme");
+            document.documentElement.classList.remove("dark-theme");
+            document.documentElement.classList.add("light-theme");
+            if (iconThemeSun) iconThemeSun.classList.add("hidden");
+            if (iconThemeMoon) iconThemeMoon.classList.remove("hidden");
+            if (btnThemeToggle) btnThemeToggle.title = "Switch to Dark Mode";
+        } else {
+            document.body.classList.remove("light-theme");
+            document.body.classList.add("dark-theme");
+            document.documentElement.classList.remove("light-theme");
+            document.documentElement.classList.add("dark-theme");
+            if (iconThemeSun) iconThemeSun.classList.remove("hidden");
+            if (iconThemeMoon) iconThemeMoon.classList.add("hidden");
+            if (btnThemeToggle) btnThemeToggle.title = "Switch to Light Mode";
+        }
+        try {
+            localStorage.setItem("spotiless_theme", theme);
+        } catch (e) {}
+    }
+
+    function toggleTheme() {
+        const isLight = document.body.classList.contains("light-theme");
+        applyTheme(isLight ? "dark" : "light");
+    }
+
     async function init() {
+        initTheme();
         await refreshStatus();
         await loadGameState();
         setupEventListeners();
@@ -1013,6 +1051,7 @@ document.addEventListener("DOMContentLoaded", () => {
         document.getElementById("btn-open-mode").addEventListener("click", openModeModal);
         document.getElementById("btn-open-stats").addEventListener("click", openStatsModal);
         document.getElementById("btn-open-auth").addEventListener("click", openAuthModal);
+        if (btnThemeToggle) btnThemeToggle.addEventListener("click", toggleTheme);
 
         // Keyboard Shortcuts
         window.addEventListener("keydown", (e) => {

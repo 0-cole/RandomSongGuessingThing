@@ -1,8 +1,10 @@
 # Spotiless Agent Guidelines
 
-## 1. Context-First Principle
-- **Consult `spotiless_context.md` first**: The repository architecture, ports (`http://127.0.0.1:4321`), launcher behavior, audio resolver, and verified dependencies are already documented in `spotiless_context.md` at the project root.
-- **Do not rebuild context from scratch**: Do not run broad terminal scans, directory walks, or full-repo greps to rediscover how Spotiless works. Trust the context file.
+## 1. Preflight Order (Rules -> Context -> Task)
+- **Rules First**: Review all active user and project rules prior to tool use or planning.
+- **Context Second (`spotiless_context.md`)**: The repository architecture, ports (`http://127.0.0.1:4321`), launcher behavior, audio resolver, and verified dependencies are already documented in `spotiless_context.md` at the project root. Do not rebuild context from scratch or run broad scans.
+- **Task Execution Third**: Only after verifying rules and context, proceed directly to targeted file edits with minimal tool calls.
+- **Visible Preflight**: Include `> **Preflight Check**: Rules verified | Context confirmed (spotiless_context.md) | Target: <file> (Budget: ≤2 calls)` at the beginning of task execution responses.
 
 ## 2. Targeted Minimal Analysis (Fast-Path Execution)
 - **Calibrate to Request Complexity**:

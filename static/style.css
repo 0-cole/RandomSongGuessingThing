@@ -3,7 +3,7 @@
    Inspired by Lessgames (Songless) & Spotify Dark Modern Aesthetic
 ---------------------------------------------------------------- */
 
-:root {
+:root, body.dark-theme {
     --bg-main: #121314;
     --bg-surface: #1e2022;
     --bg-surface-elevated: #282b2e;
@@ -33,6 +33,34 @@
 
     --shadow-soft: 0 4px 20px rgba(0, 0, 0, 0.35);
     --shadow-card: 0 8px 32px rgba(0, 0, 0, 0.5);
+    --modal-backdrop: rgba(0, 0, 0, 0.75);
+    --visualizer-bg: rgba(0, 0, 0, 0.25);
+}
+
+body.light-theme {
+    --bg-main: #f5f7f9;
+    --bg-surface: #ffffff;
+    --bg-surface-elevated: #ebf0f4;
+    --bg-tile: #e1e6ec;
+    --bg-tile-hover: #d2d9e1;
+    
+    --color-text: #14171a;
+    --color-text-muted: #56616d;
+    --color-text-subtle: #828e9c;
+    --border-color: rgba(0, 0, 0, 0.09);
+    --border-highlight: rgba(0, 0, 0, 0.18);
+    
+    --color-spotify: #1db954;
+    --color-spotify-hover: #169c46;
+    --color-correct: #2e9e19;
+    --color-incorrect: #d93838;
+    --color-skipped: #7e8893;
+    --color-accent: #1a73e8;
+
+    --shadow-soft: 0 4px 18px rgba(0, 0, 0, 0.06);
+    --shadow-card: 0 12px 36px rgba(0, 0, 0, 0.12);
+    --modal-backdrop: rgba(15, 20, 25, 0.55);
+    --visualizer-bg: rgba(0, 0, 0, 0.04);
 }
 
 * {
@@ -43,39 +71,70 @@
     -webkit-tap-highlight-color: transparent;
 }
 
+html {
+    width: 100%;
+    min-height: 100%;
+}
+
 body {
     background-color: var(--bg-main);
     color: var(--color-text);
     font-family: var(--font-body);
+    width: 100%;
     min-height: 100vh;
+    margin: 0;
+    padding: 0;
     display: flex;
-    justify-content: center;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
     overflow-x: hidden;
     user-select: none;
+    transition: background-color 0.25s ease, color 0.25s ease;
 }
 
 .app-layout {
     width: 100%;
     max-width: 690px;
+    margin-left: auto;
+    margin-right: auto;
     min-height: 100vh;
     display: flex;
     flex-direction: column;
     padding: 20px 24px 28px;
+    box-sizing: border-box;
 }
 
 /* ----------------- Top Navbar ----------------- */
 .navbar {
-    display: flex;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
     align-items: center;
-    justify-content: space-between;
     padding-bottom: 18px;
     border-bottom: 1px solid var(--border-color);
+    width: 100%;
 }
 
-.nav-left, .nav-right {
+.nav-left {
     display: flex;
     align-items: center;
     gap: 8px;
+    justify-self: start;
+}
+
+.nav-center {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    justify-self: center;
+    text-align: center;
+}
+
+.nav-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    justify-self: end;
 }
 
 .logo {
@@ -269,8 +328,8 @@ body {
     font-size: 0.75rem;
     font-weight: 700;
     color: var(--color-text-muted);
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: var(--bg-surface-elevated);
+    border: 1px solid var(--border-color);
     padding: 3px 8px;
     border-radius: var(--radius-full);
     white-space: nowrap;
@@ -287,7 +346,7 @@ body {
 .game-progress-track {
     width: 100%;
     height: 6px;
-    background: rgba(255, 255, 255, 0.06);
+    background: var(--bg-tile);
     border-radius: var(--radius-full);
     overflow: hidden;
 }
@@ -309,13 +368,14 @@ body {
     display: flex;
     flex-direction: column;
     gap: 16px;
+    box-shadow: var(--shadow-soft);
 }
 
 .visualizer-container {
     width: 100%;
     height: 52px;
     border-radius: var(--radius-sm);
-    background: rgba(0, 0, 0, 0.25);
+    background: var(--visualizer-bg);
     overflow: hidden;
     display: flex;
     align-items: center;
@@ -365,6 +425,12 @@ body {
     box-shadow: 0 0 24px rgba(255, 255, 255, 0.4);
 }
 
+body.light-theme .btn-circle-play.playing {
+    background: #14171a;
+    color: #fff;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
+}
+
 .playback-info {
     position: absolute;
     right: 6px;
@@ -399,7 +465,7 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-color);
     transition: all 0.25s ease;
 }
 
@@ -413,7 +479,7 @@ body {
 
 .segment.unlocked {
     background: var(--bg-surface-elevated);
-    border-color: rgba(255, 255, 255, 0.2);
+    border-color: var(--border-highlight);
 }
 
 .segment.unlocked .seg-label {
@@ -455,6 +521,7 @@ body {
     font-size: 0.95rem;
     font-weight: 600;
     transition: all 0.2s ease;
+    box-shadow: var(--shadow-soft);
 }
 
 .guess-row .row-num {
@@ -465,8 +532,8 @@ body {
 }
 
 .guess-row.skipped {
-    background: rgba(255, 255, 255, 0.03);
-    border-color: transparent;
+    background: var(--bg-surface-elevated);
+    border-color: var(--border-color);
     color: var(--color-skipped);
 }
 
@@ -476,10 +543,22 @@ body {
     color: #ff7676;
 }
 
+body.light-theme .guess-row.wrong {
+    background: rgba(220, 53, 69, 0.1);
+    border-color: rgba(220, 53, 69, 0.35);
+    color: #c82333;
+}
+
 .guess-row.correct {
     background: rgba(85, 183, 37, 0.15);
     border-color: rgba(85, 183, 37, 0.45);
     color: #6ef137;
+}
+
+body.light-theme .guess-row.correct {
+    background: rgba(46, 158, 25, 0.12);
+    border-color: rgba(46, 158, 25, 0.4);
+    color: #218838;
 }
 
 /* ----------------- Action Dock & Search ----------------- */
@@ -556,7 +635,7 @@ body {
     gap: 12px;
     padding: 10px 14px;
     cursor: pointer;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    border-bottom: 1px solid var(--border-color);
     transition: background 0.15s;
 }
 
@@ -692,7 +771,7 @@ kbd {
 .modal-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.75);
+    background: var(--modal-backdrop);
     backdrop-filter: blur(8px);
     z-index: 500;
     display: flex;
@@ -883,7 +962,7 @@ kbd {
 .reveal-progress-track {
     width: 100%;
     height: 6px;
-    background: rgba(255, 255, 255, 0.08);
+    background: var(--bg-tile);
     border-radius: var(--radius-full);
     overflow: hidden;
 }
@@ -1403,7 +1482,7 @@ kbd {
 .spinner {
     width: 20px;
     height: 20px;
-    border: 2px solid rgba(255, 255, 255, 0.2);
+    border: 2px solid var(--border-highlight);
     border-top-color: var(--color-spotify);
     border-radius: 50%;
     animation: spin 0.8s linear infinite;
@@ -1413,19 +1492,78 @@ kbd {
     to { transform: rotate(360deg); }
 }
 
-
-/* Bottom Right Corner Disclaimer */
-.bottom-right-footnote {
-    position: fixed;
-    bottom: 12px;
-    right: 16px;
-    font-size: 0.72rem;
+/* Centered Page Footer */
+.page-footnote {
+    text-align: center;
+    font-size: 0.74rem;
     color: var(--color-text-subtle);
+    margin-top: 14px;
+    padding-bottom: 12px;
     pointer-events: none;
     user-select: none;
-    z-index: 100;
 }
 
+/* Theme Toggle Button */
+#btn-theme-toggle {
+    transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.2s, color 0.2s;
+}
+
+#btn-theme-toggle:hover {
+    transform: rotate(20deg) scale(1.08);
+}
+
+body.light-theme .theme-icon {
+    color: var(--color-text);
+}
+
+/* Light Theme Component Specific Adjustments */
+body.light-theme .nav-pill {
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+body.light-theme .icon-button {
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+body.light-theme .game-progress-card {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
+}
+
+body.light-theme .game-counter-badge {
+    background: #e9eef3;
+    border-color: rgba(0, 0, 0, 0.12);
+}
+
+body.light-theme .search-box-wrapper input {
+    background: #ffffff;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+body.light-theme .toast {
+    background: #17191c;
+    color: #ffffff;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+}
+
+body.light-theme .instructions-box {
+    background: var(--bg-surface-elevated);
+    border: 1px solid var(--border-color);
+}
+
+body.light-theme .oauth-quick-box {
+    background: rgba(29, 185, 84, 0.08) !important;
+}
+
+body.light-theme .multi-playlist-bar {
+    background: #ffffff;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+body.light-theme kbd {
+    background: #e6ebf0;
+    color: #17191c;
+    border-color: rgba(0, 0, 0, 0.15);
+}
 
 /* Clean frameless aesthetic: hide scrollbars globally while retaining scroll */
 ::-webkit-scrollbar {
