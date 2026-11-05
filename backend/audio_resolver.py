@@ -58,7 +58,7 @@ class AudioResolver:
                     track.get("artist"),
                     track_id,
                 )
-                raw_bytes = self.spotify_mgr.get_track_audio_bytes(track_uri, max_seconds=15)
+                raw_bytes = self.spotify_mgr.get_track_audio_bytes(track_uri, max_seconds=25)
                 if raw_bytes and len(raw_bytes) > 5000:
                     self.memory_cache[track_id] = raw_bytes
                     try:

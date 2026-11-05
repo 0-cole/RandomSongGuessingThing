@@ -26,7 +26,8 @@
   - Implemented port-4070 Mercury playlist & track metadata resolution (`hm://playlist/v2/playlist/{id}` and `hm://metadata/4/track/{hex_id}`).
   - Implemented direct port-4070 `Packet.Type.stream_chunk` CDN resolution + AES-128-CTR decryption + 167-byte Spotify header stripping + exact `OggS` page boundary trimming in `get_track_audio_bytes()`.
 - [`backend/game_engine.py`](file:///C:/Users/cdbla/Documents/GitHub/Spotiless/backend/game_engine.py): Updated `DEMO_TRACKS` to use native Spotify track IDs and `i.scdn.co` artwork.
-- [`static/app.js`](file:///C:/Users/cdbla/Documents/GitHub/Spotiless/static/app.js): Added auto-skip (`startNewRound()`) if a track fails to decode, and updated `btnOAuthLogin` / `openAuthModal` to handle instant credential reconnection (`already_connected`).
+- [`static/audio_player.js`](file:///C:/Users/cdbla/Documents/GitHub/Spotiless/static/audio_player.js): Added `detectAudioStartOffset()` in `MicroAudioEngine` to scan decoded PCM audio in 10ms steps (40ms/100ms RMS windows relative to track reference loudness), automatically skipping silent or near-silent intros to the actual beginning of the song (or falling back to a random audible section for slow ambient swells).
+- [`static/app.js`](file:///C:/Users/cdbla/Documents/GitHub/Spotiless/static/app.js): Added auto-skip (`startNextRound()`) if a track fails to decode or is silent, and updated `btnOAuthLogin` / `openAuthModal` to handle instant credential reconnection (`already_connected`).
 
 ## 4. Immediate Next Steps
 - Ready for gameplay across all user playlists, difficulty modes, and curated Spotify categories.
