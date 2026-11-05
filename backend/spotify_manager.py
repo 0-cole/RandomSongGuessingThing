@@ -207,15 +207,19 @@ class SpotifyManager:
             return False
 
     def _ensure_session(self) -> bool:
-        """Ensure the native Librespot session is alive, reconnecting if needed."""
+        """Ensure the native Librespot session is alive, reconnecting if needed (e.g. after laptop sleep)."""
         with self.auth_lock:
             if self.session is not None:
                 try:
-                    if getattr(self.session, "is_valid", lambda: True)():
+                    rcvr = getattr(self.session, "_Session__receiver", None)
+                    th = getattr(rcvr, "_Receiver__thread", None)
+                    if th is not None and not th.is_alive():
+                        logger.info("Librespot receiver thread died (sleep/network change), reconnecting...")
+                        self.session = None
+                    else:
                         return True
                 except Exception:
-                    pass
-                return True
+                    self.session = None
             if self.playback_grant:
                 return self._connect_session_from_playback_grant(self.playback_grant)
             sf = _read_spotifast_win_credentials()
@@ -981,7 +985,13 @@ class SpotifyManager:
     def start_oauth_flow(self) -> Dict[str, Any]:
         import hashlib
         import urllib.parse
+        import webbrowser
         from http.server import HTTPServer, BaseHTTPRequestHandler
+
+        # If Spotifast credentials exist on this PC, restore native Librespot session immediately
+        self.session = None
+        if self.load_stored_session() and self.session is not None:
+            return {"success": True, "already_connected": True}
 
         verifier = base64.urlsafe_b64encode(os.urandom(32)).rstrip(b"=").decode()
         challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode()
@@ -1077,5 +1087,10 @@ class SpotifyManager:
             logger.info("OAuth redirect listener started on http://127.0.0.1:8989/login")
         except Exception as e:
             logger.warning("Could not bind 8989 for OAuth redirect: %s", e)
+
+        try:
+            webbrowser.open(auth_url)
+        except Exception:
+            pass
 
         return {"success": True, "auth_url": auth_url}

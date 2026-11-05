@@ -612,6 +612,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // ----------------- Spotify Auth Modal -----------------
     function openAuthModal() {
+        if (btnOAuthLogin) btnOAuthLogin.disabled = false;
+        if (oauthStatusText) oauthStatusText.textContent = "Sign in securely through your browser in 1 click.";
         modalAuth.classList.remove("hidden");
     }
 
@@ -636,8 +638,16 @@ document.addEventListener("DOMContentLoaded", () => {
             try {
                 const res = await fetch("/api/auth/oauth_start", { method: "POST" });
                 const data = await res.json();
+                if (data.success && data.already_connected) {
+                    oauthStatusText.textContent = "Connected successfully!";
+                    await refreshStatus();
+                    await loadGameState();
+                    closeModals();
+                    showToast("Connected to Spotify!");
+                    btnOAuthLogin.disabled = false;
+                    return;
+                }
                 if (data.success && data.auth_url) {
-                    window.open(data.auth_url, "_blank");
                     oauthStatusText.textContent = "Waiting for you to click 'Agree' in Spotify...";
 
                     if (authPollingInterval) clearInterval(authPollingInterval);
