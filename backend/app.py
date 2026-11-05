@@ -7,7 +7,7 @@ from backend.game_engine import GameEngine
 
 STATIC_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
 
-__version__ = '1.0.10'
+__version__ = '1.1.0'
 
 app = Flask(__name__, static_folder=STATIC_DIR)
 
@@ -43,7 +43,11 @@ def get_status():
         "mode": game_engine.difficulty,
         "name": game_engine.playlist_name,
         "playlist_ids": game_engine.playlist_ids,
-        "total_tracks": len(game_engine.track_pool)
+        "total_tracks": len(game_engine.track_pool),
+        "song_index": len(game_engine.played_track_ids),
+        "session_won": game_engine.session_won,
+        "session_played": game_engine.session_played,
+        "cycle_count": game_engine.cycle_count
     }
     return jsonify(status_data)
 

@@ -18,6 +18,7 @@
                 <button id="btn-open-mode" class="nav-pill" title="Select Difficulty or Playlist">
                     <span class="pill-dot"></span>
                     <span id="active-pool-label">🔥 Heavy Rotation</span>
+                    <span id="nav-counter-pill" class="nav-counter-pill" title="Current song / total songs in pool">1/50</span>
                     <svg class="chevron-icon" viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M7 10l5 5 5-5z"/></svg>
                 </button>
             </div>
@@ -43,6 +44,26 @@
 
         <!-- Main Guessing Stage -->
         <main class="game-container">
+            <!-- Playlist Game Session Progress Card -->
+            <div class="game-progress-card" id="game-progress-card">
+                <div class="game-progress-header">
+                    <div class="progress-left">
+                        <span class="game-counter-badge">
+                            <span class="counter-icon">🎵</span>
+                            <span class="counter-text">Song <strong id="song-counter-current">1</strong> of <span id="song-counter-total">50</span></span>
+                        </span>
+                        <span class="progress-playlist-name" id="song-counter-pool-label">🔥 Heavy Rotation</span>
+                    </div>
+                    <div class="progress-right">
+                        <span class="progress-score-pill" id="progress-score-pill">0 won</span>
+                        <span class="progress-pct-badge" id="song-progress-pct">2%</span>
+                    </div>
+                </div>
+                <div class="game-progress-track">
+                    <div class="game-progress-fill" id="song-progress-fill" style="width: 2%;"></div>
+                </div>
+            </div>
+
             <!-- Audio Player & Snippet Timeline Card -->
             <section class="player-card">
                 <div class="visualizer-container">
@@ -132,6 +153,18 @@
                     <p id="reveal-artist-name">Artist Name</p>
                     <span id="reveal-album-name" class="album-tag">Album Title</span>
                 </div>
+            </div>
+
+            <!-- Playlist Progress in Reveal Modal -->
+            <div class="reveal-progress-box" id="reveal-progress-box">
+                <div class="reveal-progress-info">
+                    <span class="reveal-progress-label" id="reveal-progress-label">Song 1 of 50 • Heavy Rotation</span>
+                    <span class="reveal-progress-score" id="reveal-progress-score">0/1 won</span>
+                </div>
+                <div class="reveal-progress-track">
+                    <div class="reveal-progress-fill" id="reveal-progress-fill" style="width: 2%;"></div>
+                </div>
+                <div id="reveal-completion-banner" class="reveal-completion-banner hidden"></div>
             </div>
 
             <!-- Guess Grid Preview -->

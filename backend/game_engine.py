@@ -44,6 +44,9 @@ class GameEngine:
         self.playlist_name = ""
         self.track_pool: List[Dict[str, Any]] = []
         self.played_track_ids: set[str] = set()
+        self.session_won = 0
+        self.session_played = 0
+        self.cycle_count = 0
         
         # Current active round
         self.current_track: Optional[Dict[str, Any]] = None
@@ -164,15 +167,28 @@ class GameEngine:
                     tracks = DEMO_TRACKS
                     self.playlist_name = "Demo / Sample Pack"
 
-        self.track_pool = tracks
+        # Deduplicate tracks by id to ensure track_pool count matches unique played_track_ids
+        unique_tracks = []
+        seen = set()
+        for t in tracks:
+            tid = t.get("id")
+            if tid and tid not in seen:
+                seen.add(tid)
+                unique_tracks.append(t)
+
+        self.track_pool = unique_tracks if unique_tracks else tracks
         self.played_track_ids.clear()
+        self.session_won = 0
+        self.session_played = 0
+        self.cycle_count = 0
         
         return {
             "success": True,
             "mode": mode,
             "playlist_name": self.playlist_name,
             "playlist_ids": self.playlist_ids,
-            "total_tracks": len(self.track_pool)
+            "total_tracks": len(self.track_pool),
+            "song_index": 0
         }
 
     def start_new_round(self) -> Dict[str, Any]:
@@ -184,6 +200,7 @@ class GameEngine:
         if not available:
             # Cycled through all songs, reset session history
             self.played_track_ids.clear()
+            self.cycle_count += 1
             available = self.track_pool
 
         self.current_track = random.choice(available)
@@ -203,6 +220,11 @@ class GameEngine:
 
         unlocked_sec = SNIPPET_STAGES[self.attempt_index] if self.attempt_index < len(SNIPPET_STAGES) else SNIPPET_STAGES[-1]
 
+        total_songs = len(self.track_pool)
+        song_index = len(self.played_track_ids)
+        is_final_song = (song_index >= total_songs and total_songs > 0)
+        playlist_completed = is_final_song and self.is_over
+
         state = {
             "active": True,
             "round_id": self.current_track["id"],
@@ -215,7 +237,14 @@ class GameEngine:
             "is_over": self.is_over,
             "pool_name": self.playlist_name,
             "playlist_ids": self.playlist_ids,
-            "pool_size": len(self.track_pool),
+            "pool_size": total_songs,
+            "song_index": song_index,
+            "total_songs": total_songs,
+            "session_won": self.session_won,
+            "session_played": self.session_played,
+            "is_final_song": is_final_song,
+            "playlist_completed": playlist_completed,
+            "cycle_count": self.cycle_count,
             "stats": self.stats
         }
 
@@ -307,6 +336,8 @@ class GameEngine:
         return self.get_client_round_state()
 
     def _update_stats_win(self, attempt_number: int):
+        self.session_won += 1
+        self.session_played += 1
         self.stats["played"] += 1
         self.stats["won"] += 1
         self.stats["current_streak"] += 1
@@ -317,6 +348,7 @@ class GameEngine:
         self._save_stats()
 
     def _update_stats_loss(self):
+        self.session_played += 1
         self.stats["played"] += 1
         self.stats["current_streak"] = 0
         self._save_stats()
@@ -338,7 +370,10 @@ class GameEngine:
 
         grid_str = "".join(grid)
         status = f"Solved in {SNIPPET_STAGES[len(self.guesses)-1]}s! 🎯" if self.is_won else "Couldn't guess this one! 💀"
-        return f"Songless Spotify ({self.playlist_name})\n{status}\n{grid_str}\nStreak: {self.stats['current_streak']} 🔥"
+        total = len(self.track_pool)
+        idx = len(self.played_track_ids)
+        progress_str = f"Song {idx}/{total}"
+        return f"Songless Spotify ({self.playlist_name})\n{progress_str} • {status}\n{grid_str}\nStreak: {self.stats['current_streak']} 🔥"
 
     def search_candidates(self, query: str, limit: int = 8) -> List[Dict[str, Any]]:
         """Autocomplete search across the active track pool"""

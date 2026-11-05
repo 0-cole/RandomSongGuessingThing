@@ -23,6 +23,13 @@ document.addEventListener("DOMContentLoaded", () => {
     const btnGiveUp = document.getElementById("btn-give-up");
     const streakCounter = document.getElementById("streak-counter");
     const activePoolLabel = document.getElementById("active-pool-label");
+    const navCounterPill = document.getElementById("nav-counter-pill");
+    const songCounterCurrent = document.getElementById("song-counter-current");
+    const songCounterTotal = document.getElementById("song-counter-total");
+    const songCounterPoolLabel = document.getElementById("song-counter-pool-label");
+    const songProgressPct = document.getElementById("song-progress-pct");
+    const songProgressFill = document.getElementById("song-progress-fill");
+    const progressScorePill = document.getElementById("progress-score-pill");
     const authStatusDot = document.getElementById("auth-status-dot");
     const authUsernameLabel = document.getElementById("auth-username-label");
     const toast = document.getElementById("toast");
@@ -42,6 +49,10 @@ document.addEventListener("DOMContentLoaded", () => {
     const revealArtistName = document.getElementById("reveal-artist-name");
     const revealAlbumName = document.getElementById("reveal-album-name");
     const revealEmojiGrid = document.getElementById("reveal-emoji-grid");
+    const revealProgressLabel = document.getElementById("reveal-progress-label");
+    const revealProgressScore = document.getElementById("reveal-progress-score");
+    const revealProgressFill = document.getElementById("reveal-progress-fill");
+    const revealCompletionBanner = document.getElementById("reveal-completion-banner");
     const btnPlayRevealSong = document.getElementById("btn-play-reveal-song");
     const btnShare = document.getElementById("btn-share");
     const btnNextSong = document.getElementById("btn-next-song");
@@ -159,6 +170,10 @@ document.addEventListener("DOMContentLoaded", () => {
             }
             if (data.active_pool) {
                 activePoolLabel.textContent = data.active_pool.name || "🔥 Heavy Rotation";
+                if (navCounterPill && data.active_pool.total_tracks) {
+                    const idx = data.active_pool.song_index || 1;
+                    navCounterPill.textContent = `${idx}/${data.active_pool.total_tracks}`;
+                }
             }
         } catch (err) {
             console.error("Status check failed:", err);
@@ -193,6 +208,26 @@ document.addEventListener("DOMContentLoaded", () => {
         labelPlaybackTime.textContent = `${state.unlocked_seconds}s`;
         if (state.pool_name) {
             activePoolLabel.textContent = state.pool_name;
+        }
+
+        // Update playlist progress & song counter
+        const songIdx = state.song_index || 1;
+        const totalSongs = state.total_songs || state.pool_size || 1;
+        const pct = Math.min(100, Math.max(1, Math.round((songIdx / totalSongs) * 100)));
+
+        if (songCounterCurrent) songCounterCurrent.textContent = songIdx;
+        if (songCounterTotal) songCounterTotal.textContent = totalSongs;
+        if (songCounterPoolLabel) songCounterPoolLabel.textContent = state.pool_name || "🔥 Heavy Rotation";
+        if (songProgressPct) songProgressPct.textContent = `${pct}% Done`;
+        if (songProgressFill) songProgressFill.style.width = `${pct}%`;
+        if (navCounterPill) navCounterPill.textContent = `${songIdx}/${totalSongs}`;
+
+        if (progressScorePill) {
+            if (typeof state.session_played === "number" && state.session_played > 0) {
+                progressScorePill.textContent = `${state.session_won || 0}/${state.session_played} won`;
+            } else {
+                progressScorePill.textContent = `0 won`;
+            }
         }
 
         // Update timeline segments
@@ -453,6 +488,33 @@ document.addEventListener("DOMContentLoaded", () => {
                 const span = document.createElement("span");
                 span.textContent = "⬜";
                 revealEmojiGrid.appendChild(span);
+            }
+        }
+
+        // Update reveal progress & counter
+        const songIdx = state.song_index || 1;
+        const totalSongs = state.total_songs || state.pool_size || 1;
+        const pct = Math.min(100, Math.max(1, Math.round((songIdx / totalSongs) * 100)));
+
+        if (revealProgressLabel) {
+            revealProgressLabel.textContent = `Song ${songIdx} of ${totalSongs} • ${state.pool_name || "Playlist"}`;
+        }
+        if (revealProgressScore) {
+            revealProgressScore.textContent = `${state.session_won || 0}/${state.session_played || 1} won`;
+        }
+        if (revealProgressFill) {
+            revealProgressFill.style.width = `${pct}%`;
+        }
+
+        if (revealCompletionBanner) {
+            if (state.playlist_completed) {
+                revealCompletionBanner.classList.remove("hidden");
+                revealCompletionBanner.innerHTML = `🏆 <strong>Playlist Completed!</strong> You solved <strong>${state.session_won || 0} / ${totalSongs}</strong> songs!`;
+                if (btnNextSong) btnNextSong.querySelector("span").textContent = `Restart / Play Again (1 / ${totalSongs}) ↺`;
+            } else {
+                revealCompletionBanner.classList.add("hidden");
+                const nextIdx = Math.min(totalSongs, songIdx + 1);
+                if (btnNextSong) btnNextSong.querySelector("span").textContent = `Next Song (${nextIdx} / ${totalSongs}) →`;
             }
         }
 

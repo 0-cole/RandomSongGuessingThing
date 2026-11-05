@@ -11,6 +11,7 @@ venv/
 # Game & Spotify Cache / Secrets
 session_cache.json
 game_stats.json
+credentials.json
 audio_cache/
 .profile/
 
