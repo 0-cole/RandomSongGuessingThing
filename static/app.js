@@ -383,6 +383,49 @@ document.addEventListener("DOMContentLoaded", () => {
             loadGameState();
         }
         setupEventListeners();
+        checkAccountState();
+    }
+
+    function checkAccountState() {
+        const acc = getStoredAccount();
+        const cookie = localStorage.getItem("spotiless_sp_dc");
+        const guest = sessionStorage.getItem("spotiless_guest_session");
+
+        if (acc && acc.username) {
+            authStatusDot.className = "dot-connected";
+            authUsernameLabel.textContent = acc.username;
+            if (userNameDisplay) userNameDisplay.textContent = acc.username;
+            if (authConnectedView) authConnectedView.classList.remove("hidden");
+            const unconnected = document.getElementById("auth-unconnected-view");
+            if (unconnected) unconnected.classList.add("hidden");
+        } else if (cookie) {
+            authStatusDot.className = "dot-connected";
+            authUsernameLabel.textContent = "Spotify Linked 🍪";
+            if (userNameDisplay) userNameDisplay.textContent = "Spotify Cookie Linked";
+            if (authConnectedView) authConnectedView.classList.remove("hidden");
+            const unconnected = document.getElementById("auth-unconnected-view");
+            if (unconnected) unconnected.classList.add("hidden");
+        } else {
+            authStatusDot.className = "dot-disconnected";
+            authUsernameLabel.textContent = "Connect Spotify";
+            if (authConnectedView) authConnectedView.classList.add("hidden");
+            const unconnected = document.getElementById("auth-unconnected-view");
+            if (unconnected) unconnected.classList.remove("hidden");
+
+            // First visit prompt if not guest
+            if (!guest) {
+                openAuthModal();
+            }
+        }
+    }
+
+    function getStoredAccount() {
+        try {
+            const raw = localStorage.getItem("spotiless_account");
+            return raw ? JSON.parse(raw) : null;
+        } catch (e) {
+            return null;
+        }
     }
 
     async function refreshStatus() {
@@ -466,7 +509,9 @@ document.addEventListener("DOMContentLoaded", () => {
         const audioFallback = state.solution ? `${state.solution.artist} ${state.solution.name}` : (state.preview_query || "");
         audio.loadTrack(state.round_id, audioFallback).then((ok) => {
             showSpinner(false);
-            if (!ok) { startNextRound(); }
+            if (!ok) {
+                console.warn("Audio snippet preview unavailable or waiting for interaction:", state.round_id);
+            }
         });
 
         // Update labels
@@ -1078,9 +1123,10 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // ----------------- Spotify Auth Modal -----------------
+    let isSignUpMode = true;
+
     function openAuthModal() {
-        if (btnOAuthLogin) btnOAuthLogin.disabled = false;
-        if (oauthStatusText) oauthStatusText.textContent = "Sign in securely through your browser in 1 click.";
+        checkAccountState();
         modalAuth.classList.remove("hidden");
     }
 
@@ -1091,128 +1137,106 @@ document.addEventListener("DOMContentLoaded", () => {
             tabBtns.forEach(b => b.classList.remove("active"));
             document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
             btn.classList.add("active");
-            document.getElementById(btn.dataset.tab).classList.add("active");
+            const target = document.getElementById(btn.dataset.tab);
+            if (target) target.classList.add("active");
         });
     });
 
-    const btnOAuthLogin = document.getElementById("btn-oauth-login");
-    const oauthStatusText = document.getElementById("oauth-status-text");
+    // Account Creation / Sign In form
+    const formLocalAccount = document.getElementById("form-local-account");
+    const accUserInput = document.getElementById("acc-username-input");
+    const accPassInput = document.getElementById("acc-password-input");
+    const btnToggleAccountMode = document.getElementById("btn-toggle-account-mode");
+    const formAccTitle = document.getElementById("form-acc-title");
+    const btnSubmitAccount = document.getElementById("btn-submit-account");
 
-    if (btnOAuthLogin) {
-        btnOAuthLogin.addEventListener("click", async () => {
-            btnOAuthLogin.disabled = true;
-            oauthStatusText.textContent = "Opening Spotify in your browser...";
-            try {
-                const res = await fetch("/api/auth/oauth_start", { method: "POST" });
-                const data = await res.json();
-                if (data.success && data.already_connected) {
-                    oauthStatusText.textContent = "Connected successfully!";
-                    await refreshStatus();
-                    await loadGameState();
-                    closeModals();
-                    showToast("Connected to Spotify!");
-                    btnOAuthLogin.disabled = false;
-                    return;
-                }
-                if (data.success && data.auth_url) {
-                    oauthStatusText.textContent = "Waiting for you to click 'Agree' in Spotify...";
-
-                    if (authPollingInterval) clearInterval(authPollingInterval);
-                    authPollingInterval = setInterval(async () => {
-                        const sRes = await fetch("/api/status");
-                        const sData = await sRes.json();
-                        if (sData.connected) {
-                            clearInterval(authPollingInterval);
-                            oauthStatusText.textContent = "Connected successfully!";
-                            await refreshStatus();
-                            await loadGameState();
-                            closeModals();
-                            showToast("Connected to Spotify!");
-                            btnOAuthLogin.disabled = false;
-                        }
-                    }, 1200);
-                } else {
-                    oauthStatusText.textContent = "Could not start authorization flow.";
-                    btnOAuthLogin.disabled = false;
-                }
-            } catch (err) {
-                oauthStatusText.textContent = "Connection error: " + err;
-                btnOAuthLogin.disabled = false;
+    if (btnToggleAccountMode) {
+        btnToggleAccountMode.addEventListener("click", () => {
+            isSignUpMode = !isSignUpMode;
+            if (isSignUpMode) {
+                formAccTitle.textContent = "Create Your Permanent Account";
+                btnSubmitAccount.textContent = "Create Permanent Account & Play";
+                btnToggleAccountMode.textContent = "Already have an account? Sign In";
+            } else {
+                formAccTitle.textContent = "Sign In to Your Account";
+                btnSubmitAccount.textContent = "Sign In & Play";
+                btnToggleAccountMode.textContent = "Need an account? Sign Up";
             }
         });
     }
 
-    btnStartZeroconf.addEventListener("click", async () => {
-        zcBtnText.textContent = "Advertising 'Songless Guessing Game'...";
-        btnStartZeroconf.disabled = true;
-        zcStatusText.textContent = "Listening on network... Check Spotifast -> Devices!";
+    if (formLocalAccount) {
+        formLocalAccount.addEventListener("submit", (e) => {
+            e.preventDefault();
+            const user = accUserInput.value.trim();
+            const pass = accPassInput.value;
+            if (!user || !pass) return;
 
-        try {
-            const res = await fetch("/api/auth/start_zeroconf", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ device_name: "Songless Guessing Game" })
-            });
-            const data = await res.json();
-            if (data.success) {
-                // Poll for connection
-                if (authPollingInterval) clearInterval(authPollingInterval);
-                authPollingInterval = setInterval(async () => {
-                    const sRes = await fetch("/api/status");
-                    const sData = await sRes.json();
-                    if (sData.connected) {
-                        clearInterval(authPollingInterval);
-                        zcStatusText.textContent = `Connected as ${sData.display_name || sData.username}! 🎉`;
-                        showToast("Successfully authenticated with Spotify! 🚀");
-                        refreshStatus();
-                        loadGameState();
-                        setTimeout(closeModals, 1200);
-                    }
-                }, 1500);
-            }
-        } catch (err) {
-            zcStatusText.textContent = "Error starting Zeroconf receiver.";
-            btnStartZeroconf.disabled = false;
-        }
-    });
-
-    formUserPass.addEventListener("submit", async (e) => {
-        e.preventDefault();
-        const user = authUsername.value.trim();
-        const pass = authPassword.value;
-        if (!user || !pass) return;
-
-        upStatusText.textContent = "Logging into Spotify...";
-        try {
-            const res = await fetch("/api/auth/login_user_pass", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ username: user, password: pass })
-            });
-            const data = await res.json();
-            if (data.success) {
-                upStatusText.textContent = "Logged in successfully! 🎉";
-                showToast("Connected to Spotify!");
-                refreshStatus();
-                loadGameState();
-                setTimeout(closeModals, 1000);
+            const existing = getStoredAccount();
+            if (!isSignUpMode) {
+                // Sign In mode
+                if (existing && existing.username.toLowerCase() === user.toLowerCase()) {
+                    showToast(`Welcome back, ${user}! 🎉`);
+                } else {
+                    const acc = { username: user, password: pass, updated_at: new Date().toISOString() };
+                    localStorage.setItem("spotiless_account", JSON.stringify(acc));
+                    showToast(`Signed in as ${user}! 🎉`);
+                }
             } else {
-                upStatusText.textContent = `Error: ${data.error || "Login failed"}`;
+                // Create account
+                const acc = { username: user, password: pass, created_at: new Date().toISOString() };
+                localStorage.setItem("spotiless_account", JSON.stringify(acc));
+                showToast(`Permanent account created! Welcome, ${user}! 🚀`);
             }
-        } catch (err) {
-            upStatusText.textContent = "Network error during login.";
-        }
-    });
 
-    btnLogout.addEventListener("click", async () => {
-        await fetch("/api/auth/logout", { method: "POST" });
-        showToast("Logged out from Spotify.");
-        refreshStatus();
-        loadGameState();
-        closeModals();
-    });
+            checkAccountState();
+            closeModals();
+        });
+    }
 
-    // ----------------- Stats Modal -----------------
+    // Cookie Linking
+    const inputCookieSpdc = document.getElementById("input-cookie-spdc");
+    const btnSaveCookie = document.getElementById("btn-save-cookie");
+    if (btnSaveCookie && inputCookieSpdc) {
+        btnSaveCookie.addEventListener("click", () => {
+            const val = inputCookieSpdc.value.trim();
+            if (!val) {
+                alert("Please paste your Spotify sp_dc cookie first.");
+                return;
+            }
+            localStorage.setItem("spotiless_sp_dc", val);
+            showToast("Spotify cookie linked for this session! 🍪");
+            checkAccountState();
+            closeModals();
+        });
+    }
+
+    // Free Guest Play
+    const btnGuestPlayDirect = document.getElementById("btn-guest-play-direct");
+    if (btnGuestPlayDirect) {
+        btnGuestPlayDirect.addEventListener("click", () => {
+            sessionStorage.setItem("spotiless_guest_session", "true");
+            showToast("Playing as Guest! Enjoy the music 🎵");
+            closeModals();
+        });
+    }
+
+    // Logout / Disconnect
+    if (btnLogout) {
+        btnLogout.addEventListener("click", async () => {
+            localStorage.removeItem("spotiless_account");
+            localStorage.removeItem("spotiless_sp_dc");
+            sessionStorage.removeItem("spotiless_guest_session");
+            try {
+                await fetch("/api/auth/logout", { method: "POST" });
+            } catch (e) {}
+            showToast("Signed out.");
+            checkAccountState();
+            closeModals();
+        });
+    }
+
+        // ----------------- Stats Modal -----------------
     async function openStatsModal() {
         modalStats.classList.remove("hidden");
         if (isCloudMode) {

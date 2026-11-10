@@ -14,7 +14,7 @@
             } catch (e) {}
         })();
     </script>
-    <link rel="stylesheet" href="style.css?v=1.2.2">
+    <link rel="stylesheet" href="style.css?v=1.2.3">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400..800;1,9..40,400..800&family=Poppins:wght@600;700;800;900&display=swap" rel="stylesheet">
@@ -160,7 +160,7 @@
         <footer class="page-footnote">
             <span>Spoti-Less &bull; Fan-made Spotify trivia</span>
             <span class="footnote-sep">&bull;</span>
-            <button id="btn-open-privacy" class="footer-legal-link">Privacy &amp; Terms</button>
+            <button id="btn-open-privacy" class="footer-legal-link" onclick="document.getElementById('modal-privacy').classList.remove('hidden')">Privacy &amp; Terms</button>
         </footer>
     </div>
 
@@ -216,78 +216,89 @@
         </div>
     </div>
 
-    <!-- SPOTIFY AUTH MODAL -->
-    <div id="modal-auth" class="modal-overlay hidden">
-        <div class="modal-card">
+    <!-- SPOTIFY AUTH & ACCOUNT ONBOARDING MODAL -->
+    <div id="modal-auth" class="modal-overlay hidden" style="z-index: 1100;">
+        <div class="modal-card modal-wide">
             <div class="modal-header">
-                <h2>Connect Spotify</h2>
+                <h2 id="auth-modal-title">Account &amp; Spotify Link</h2>
                 <button class="modal-close-btn" data-modal="modal-auth">&times;</button>
             </div>
 
-            <!-- Primary Fast OAuth Option (Works with 2FA & Google) -->
-            <div class="oauth-quick-box" style="margin-bottom: 20px; padding: 18px; background: rgba(29, 185, 84, 0.08); border: 1px solid rgba(29, 185, 84, 0.3); border-radius: var(--radius-md); text-align: center;">
-                <p style="font-size: 0.95rem; font-weight: 700; margin-bottom: 6px; color: var(--color-spotify-hover);">✨ Recommended (Instant 2FA & Google Login)</p>
-                <p style="font-size: 0.82rem; color: var(--color-text-muted); margin-bottom: 14px;">Sign in securely through your browser in 1 click.</p>
-                <button id="btn-oauth-login" class="btn btn-primary btn-full" style="font-size: 1rem; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; gap: 8px;">
-                    <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
-                    <span>Log in with Spotify (Browser)</span>
-                </button>
-                <p id="oauth-status-text" class="status-subtext" style="margin-top: 10px; font-size: 0.82rem; color: var(--color-text-subtle);"></p>
-            </div>
-
-            <div class="auth-tabs">
-                <button class="tab-btn active" data-tab="tab-zeroconf">Spotify Connect</button>
-                <button class="tab-btn" data-tab="tab-credentials">Direct Password</button>
-            </div>
-
-            <!-- Tab 1: Spotify Connect Pairing -->
-            <div id="tab-zeroconf" class="tab-content active">
-                <div class="instructions-box">
-                    <p><strong>1-Click Pairing with Spotifast or your phone:</strong></p>
-                    <ol>
-                        <li>Click <strong>"Start Discovery Device"</strong> below.</li>
-                        <li>In Spotifast (or the official Spotify app), open the <strong>Devices</strong> menu.</li>
-                        <li>Select <strong>"Songless Guessing Game"</strong>.</li>
-                        <li>You'll be authenticated instantly and saved forever!</li>
-                    </ol>
-                </div>
-                
-                <div class="zeroconf-action-area">
-                    <button id="btn-start-zeroconf" class="btn btn-primary btn-full">
-                        <span id="zc-btn-text">Start Discovery Device</span>
-                    </button>
-                    <p id="zc-status-text" class="status-subtext">Status: Idle</p>
-                </div>
-            </div>
-
-            <!-- Tab 2: Direct Username & Password -->
-            <div id="tab-credentials" class="tab-content">
-                <form id="form-user-pass">
-                    <div class="form-group">
-                        <label>Spotify Username or Email</label>
-                        <input type="text" id="auth-username" required placeholder="e.g. your_spotify_username">
-                    </div>
-                    <div class="form-group">
-                        <label>Spotify Password</label>
-                        <input type="password" id="auth-password" required placeholder="••••••••••••">
-                    </div>
-                    <button type="submit" id="btn-submit-userpass" class="btn btn-primary btn-full">
-                        Log In Directly
-                    </button>
-                    <p id="up-status-text" class="status-subtext"></p>
-                </form>
-            </div>
-
-            <!-- Connected Profile view (if already signed in) -->
-            <div id="auth-connected-view" class="connected-card hidden">
-                <div class="user-row">
-                    <img id="user-avatar" src="" alt="Avatar" class="avatar-img">
+            <!-- Connected Profile View (when logged in) -->
+            <div id="auth-connected-view" class="connected-card hidden" style="margin-bottom: 16px;">
+                <div class="user-row" style="display: flex; align-items: center; gap: 12px; margin-bottom: 14px;">
+                    <img id="user-avatar" src="https://i.scdn.co/image/ab6775700000ee853df25b81110cd06e8f62f064" alt="Avatar" class="avatar-img" style="width: 48px; height: 48px; border-radius: 50%;">
                     <div>
-                        <h4 id="user-name-display">Username</h4>
-                        <span id="user-tier-badge" class="premium-badge">Spotify Premium</span>
+                        <h4 id="user-name-display" style="font-size: 1rem; font-weight: 700;">Account</h4>
+                        <span id="user-tier-badge" class="premium-badge" style="background: var(--color-spotify); color: #000; font-size: 0.72rem; padding: 2px 7px; border-radius: 4px; font-weight: 800;">Spotify Linked</span>
                     </div>
                 </div>
-                <button id="btn-logout" class="btn btn-secondary btn-full btn-danger">Disconnect Account</button>
+                <button id="btn-logout" class="btn btn-secondary btn-full btn-danger">Sign Out / Disconnect</button>
+            </div>
+
+            <!-- Unconnected Onboarding & Login View -->
+            <div id="auth-unconnected-view">
+                <p style="font-size: 0.85rem; color: var(--color-text-muted); margin-bottom: 14px; text-align: left;">
+                    Welcome to Spoti-Less! Link your Spotify to guess songs from your library, or play free right away:
+                </p>
+
+                <div class="auth-tabs" style="margin-bottom: 14px;">
+                    <button class="tab-btn active" data-tab="tab-account" id="tab-btn-account">👤 Permanent Account</button>
+                    <button class="tab-btn" data-tab="tab-cookie" id="tab-btn-cookie">🍪 Cookie / Guest</button>
+                </div>
+
+                <!-- Tab 1: Permanent Account (Sign Up / Sign In) -->
+                <div id="tab-account" class="tab-content active" style="text-align: left;">
+                    <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 16px; margin-bottom: 12px;">
+                        <h4 id="form-acc-title" style="font-size: 0.95rem; font-weight: 700; color: var(--color-text); margin-bottom: 6px;">
+                            Create Your Permanent Account
+                        </h4>
+                        <p style="font-size: 0.78rem; color: var(--color-text-muted); margin-bottom: 12px;">
+                            Permanently links your Spotify session, streaks, and custom playlists on this device.
+                        </p>
+                        <form id="form-local-account" style="display: flex; flex-direction: column; gap: 10px;">
+                            <div>
+                                <label style="display: block; font-size: 0.76rem; font-weight: 700; margin-bottom: 4px; color: var(--color-text-muted);">Username</label>
+                                <input type="text" id="acc-username-input" required placeholder="Choose a username" style="width: 100%; box-sizing: border-box; padding: 10px 12px; font-size: 0.85rem; background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--color-text); border-radius: var(--radius-sm);">
+                            </div>
+                            <div>
+                                <label style="display: block; font-size: 0.76rem; font-weight: 700; margin-bottom: 4px; color: var(--color-text-muted);">Password</label>
+                                <input type="password" id="acc-password-input" required placeholder="Choose a password" style="width: 100%; box-sizing: border-box; padding: 10px 12px; font-size: 0.85rem; background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--color-text); border-radius: var(--radius-sm);">
+                            </div>
+                            <button type="submit" id="btn-submit-account" class="btn btn-primary btn-full" style="font-weight: 800; margin-top: 4px;">
+                                Create Permanent Account &amp; Play
+                            </button>
+                        </form>
+                        <div style="margin-top: 10px; text-align: center;">
+                            <button id="btn-toggle-account-mode" style="background: none; border: none; font-size: 0.78rem; color: var(--color-spotify); cursor: pointer; text-decoration: underline;">
+                                Already have an account? Sign In
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab 2: Temporary Cookie or Guest -->
+                <div id="tab-cookie" class="tab-content" style="text-align: left;">
+                    <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 16px; margin-bottom: 12px;">
+                        <h4 style="font-size: 0.95rem; font-weight: 700; color: var(--color-text); margin-bottom: 6px;">
+                            Link Temporarily with Spotify Cookie
+                        </h4>
+                        <p style="font-size: 0.78rem; color: var(--color-text-muted); margin-bottom: 12px;">
+                            Quickly import your Spotify library for this session using your <code>sp_dc</code> cookie from open.spotify.com:
+                        </p>
+                        <div style="display: flex; gap: 8px; margin-bottom: 14px;">
+                            <input type="text" id="input-cookie-spdc" placeholder="Paste 'sp_dc' cookie here" style="flex: 1; padding: 10px 12px; font-size: 0.82rem; background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--color-text); border-radius: var(--radius-sm);">
+                            <button id="btn-save-cookie" class="btn btn-primary" style="white-space: nowrap; font-size: 0.82rem; font-weight: 700;">
+                                Link Cookie
+                            </button>
+                        </div>
+                        <div style="border-top: 1px solid var(--border-color); padding-top: 12px;">
+                            <button id="btn-guest-play-direct" class="btn btn-secondary btn-full" style="font-size: 0.88rem; font-weight: 700;">
+                                ▶ Play Free as Guest (Instant 50+ Top Hits)
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -401,7 +412,7 @@
     </div>
 
         <!-- PRIVACY, TERMS & LEGAL PROTECTION MODAL -->
-    <div id="modal-privacy" class="modal-overlay hidden">
+    <div id="modal-privacy" class="modal-overlay hidden" style="z-index: 1200;">
         <div class="modal-card modal-wide">
             <div class="modal-header">
                 <h2>Privacy, Terms &amp; Legal</h2>
@@ -445,7 +456,7 @@
     <!-- Toast Notification -->
     <div id="toast" class="toast hidden">Copied score to clipboard!</div>
 
-    <script src="audio_player.js?v=1.2.2"></script>
-    <script src="app.js?v=1.2.2"></script>
+    <script src="audio_player.js?v=1.2.3"></script>
+    <script src="app.js?v=1.2.3"></script>
 </body>
 </html>
