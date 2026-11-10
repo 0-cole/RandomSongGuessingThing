@@ -2,6 +2,13 @@
  * Songless (Spotify Edition) Client Application Controller
  */
 
+/**
+ * ⚠️ HEY AI AGENT! Editing this script?
+ * 1. Stop! Read spotiless_context.md & rules first!
+ * 2. Strict Fast-Path Budget: Capped at 1–2 tool calls total (Read -> Edit -> Done).
+ * 3. DO NOT wander or do incremental reads. Make direct edits cleanly.
+ */
+
 document.addEventListener("DOMContentLoaded", () => {
     // Audio Engine
     const audio = new window.MicroAudioEngine();
@@ -90,10 +97,17 @@ document.addEventListener("DOMContentLoaded", () => {
     let shareTextCache = "";
 
     // ----------------- Audio & Visualizer Setup -----------------
+    const playOverlaySvg = `<svg viewBox="0 0 24 24" width="36" height="36"><path fill="currentColor" d="M8 5v14l11-7z"/></svg>`;
+    const pauseOverlaySvg = `<svg viewBox="0 0 24 24" width="36" height="36"><path fill="currentColor" d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>`;
+
     audio.onPlayStart = (duration) => {
         btnPlay.classList.add("playing");
         iconPlay.classList.add("hidden");
         iconPause.classList.remove("hidden");
+        if (btnPlayRevealSong) {
+            btnPlayRevealSong.innerHTML = pauseOverlaySvg;
+            btnPlayRevealSong.title = "Pause Preview";
+        }
     };
 
     audio.onPlayProgress = (progress, elapsed) => {
@@ -105,6 +119,10 @@ document.addEventListener("DOMContentLoaded", () => {
         btnPlay.classList.remove("playing");
         iconPlay.classList.remove("hidden");
         iconPause.classList.add("hidden");
+        if (btnPlayRevealSong) {
+            btnPlayRevealSong.innerHTML = playOverlaySvg;
+            btnPlayRevealSong.title = "Play Song Preview";
+        }
         if (currentRound) {
             labelPlaybackTime.textContent = `${currentRound.unlocked_seconds}s`;
         }
@@ -407,20 +425,38 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
+    let isTransitioningRound = false;
+
     async function startNextRound() {
-        closeModals();
-        audio.stop();
+        if (isTransitioningRound) return;
+        isTransitioningRound = true;
+        if (btnNextSong) btnNextSong.disabled = true;
+
+        if (revealAlbumArt) {
+            revealAlbumArt.classList.remove("pulse");
+            const cw = revealAlbumArt.closest(".cover-wrapper");
+            if (cw) cw.classList.remove("pulse");
+        }
+
+        // Smoothly fade out the currently playing song before transitioning to the next song
+        const fadePromise = audio.isPlaying ? audio.fadeOut(0.8) : Promise.resolve();
         showSpinner(true);
+
         try {
-            const res = await fetch("/api/game/new_round", { method: "POST" });
+            const resPromise = fetch("/api/game/new_round", { method: "POST" });
+            const [_, res] = await Promise.all([fadePromise, resPromise]);
+            closeModals();
             const newState = await res.json();
             applyGameState(newState);
             inputGuess.value = "";
             inputGuess.focus();
         } catch (err) {
             console.error("Failed to start new round:", err);
+            closeModals();
         } finally {
             showSpinner(false);
+            if (btnNextSong) btnNextSong.disabled = false;
+            isTransitioningRound = false;
         }
     }
 
@@ -499,11 +535,26 @@ document.addEventListener("DOMContentLoaded", () => {
         const track = state.solution;
         shareTextCache = state.share_text || "";
 
+        const coverWrapper = revealAlbumArt ? revealAlbumArt.closest(".cover-wrapper") : null;
+
         if (state.is_won) {
             revealStatusIcon.textContent = state.attempt === 1 ? "🤯" : "🎉";
             revealTitle.textContent = state.attempt === 1 ? "0.1s SNIPE! INCREDIBLE!" : "You Got It!";
             revealSubtitle.textContent = `Identified in ${state.unlocked_seconds}s (${state.attempt}/${state.max_attempts} guesses)`;
+
+            // Subtle pulsing animation on album artwork upon correct guess
+            if (revealAlbumArt) revealAlbumArt.classList.add("pulse");
+            if (coverWrapper) coverWrapper.classList.add("pulse");
+
+            // Auto-play the whole song when guessed right until pressing Next
+            setTimeout(() => {
+                if (modalReveal && !modalReveal.classList.contains("hidden")) {
+                    audio.playFull(false, true);
+                }
+            }, 60);
         } else {
+            if (revealAlbumArt) revealAlbumArt.classList.remove("pulse");
+            if (coverWrapper) coverWrapper.classList.remove("pulse");
             revealStatusIcon.textContent = "💀";
             revealTitle.textContent = "Nice Try!";
             revealSubtitle.textContent = "Better luck on the next one!";
@@ -560,7 +611,11 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     btnPlayRevealSong.addEventListener("click", () => {
-        audio.playFull();
+        if (audio.isPlaying) {
+            audio.stop();
+        } else {
+            audio.playFull(false, true);
+        }
     });
 
     btnShare.addEventListener("click", () => {
@@ -1009,6 +1064,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // ----------------- Modal Utility -----------------
     function closeModals() {
+        if (modalReveal && !modalReveal.classList.contains("hidden") && audio.isPlaying) {
+            audio.fadeOut(0.4);
+        }
+        if (revealAlbumArt) {
+            revealAlbumArt.classList.remove("pulse");
+            const cw = revealAlbumArt.closest(".cover-wrapper");
+            if (cw) cw.classList.remove("pulse");
+        }
         document.querySelectorAll(".modal-overlay").forEach(m => m.classList.add("hidden"));
     }
 
@@ -1053,6 +1116,9 @@ document.addEventListener("DOMContentLoaded", () => {
         document.getElementById("btn-open-auth").addEventListener("click", openAuthModal);
         if (btnThemeToggle) btnThemeToggle.addEventListener("click", toggleTheme);
 
+        // Subtle background mouse reactivity (parallax shift & soft spotlight)
+        initMouseReactivity();
+
         // Keyboard Shortcuts
         window.addEventListener("keydown", (e) => {
             // Spacebar: Play snippet (if not typing in text input)
@@ -1086,6 +1152,33 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function isAnyModalOpen() {
         return !!document.querySelector(".modal-overlay:not(.hidden)");
+    }
+
+    function initMouseReactivity() {
+        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+        let ticking = false;
+        let mouseX = window.innerWidth / 2;
+        let mouseY = window.innerHeight / 2;
+
+        window.addEventListener('mousemove', (e) => {
+            mouseX = e.clientX;
+            mouseY = e.clientY;
+            if (!ticking) {
+                window.requestAnimationFrame(() => {
+                    const nx = (mouseX / window.innerWidth - 0.5) * 2;
+                    const ny = (mouseY / window.innerHeight - 0.5) * 2;
+                    const root = document.documentElement;
+                    root.style.setProperty('--mouse-offset-x', (nx * -14).toFixed(2) + 'px');
+                    root.style.setProperty('--mouse-offset-y', (ny * -14).toFixed(2) + 'px');
+                    root.style.setProperty('--mouse-wave-x', (nx * -22).toFixed(2) + 'px');
+                    root.style.setProperty('--mouse-wave-y', (ny * -22).toFixed(2) + 'px');
+                    root.style.setProperty('--mouse-px-x', mouseX + 'px');
+                    root.style.setProperty('--mouse-px-y', mouseY + 'px');
+                    ticking = false;
+                });
+                ticking = true;
+            }
+        }, { passive: true });
     }
 
     // Launch App

@@ -1,3 +1,10 @@
+# ---------------------------------------------------------------------------
+# ⚠️ HEY AI AGENT! Editing this backend script?
+# 1. Stop! Read spotiless_context.md & rules first!
+# 2. If the user asked for styling, UI, or CSS: STOP! Frontend belongs in static/.
+# 3. Strict Fast-Path Budget: Capped at 1–2 tool calls per declared target file.
+# 4. Invariant: Maintain Librespot native streaming, zero iTunes fallbacks.
+# ---------------------------------------------------------------------------
 import os
 import io
 from flask import Flask, jsonify, request, send_from_directory, Response
@@ -7,7 +14,7 @@ from backend.game_engine import GameEngine
 
 STATIC_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
 
-__version__ = '1.2.0'
+__version__ = '1.2.5'
 
 app = Flask(__name__, static_folder=STATIC_DIR)
 

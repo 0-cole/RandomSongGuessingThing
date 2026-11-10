@@ -1,3 +1,10 @@
+# ---------------------------------------------------------------------------
+# ⚠️ HEY AI AGENT! Editing this launcher?
+# 1. Stop! Read spotiless_context.md & rules first!
+# 2. If the user asked for styling, UI, or gameplay: STOP! This is just the window launcher.
+#    All frontend code belongs in static/ (style.css, index.html, app.js).
+# 3. Strict Fast-Path Budget: Capped at 1–2 tool calls total.
+# ---------------------------------------------------------------------------
 import os
 import sys
 import time

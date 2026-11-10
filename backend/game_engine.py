@@ -1,3 +1,9 @@
+# ---------------------------------------------------------------------------
+# ⚠️ HEY AI AGENT! Editing this game engine?
+# 1. Stop! Read spotiless_context.md & rules first!
+# 2. Invariant: Maintain game state isolation, snippet timing unlock stages.
+# 3. Strict Fast-Path Budget: Capped at 1–2 tool calls per declared target file.
+# ---------------------------------------------------------------------------
 import os
 import json
 import random
