@@ -550,8 +550,6 @@ document.addEventListener("DOMContentLoaded", () => {
             refreshStatus();
             loadGameState();
         }
-        setupEventListeners();
-        checkAccountState();
     }
 
     function checkAccountState() {
@@ -1508,20 +1506,28 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Edit Username Handlers
     const btnShowEditUsername = document.getElementById("btn-show-edit-username");
+    const btnShowEditUsernameBottom = document.getElementById("btn-show-edit-username-bottom");
     const boxEditUsername = document.getElementById("box-edit-username");
     const inputNewUsername = document.getElementById("input-new-username");
     const btnSaveNewUsername = document.getElementById("btn-save-new-username");
     const btnCancelEditUsername = document.getElementById("btn-cancel-edit-username");
 
-    if (btnShowEditUsername && boxEditUsername) {
-        btnShowEditUsername.addEventListener("click", () => {
-            boxEditUsername.classList.toggle("hidden");
-            if (!boxEditUsername.classList.contains("hidden") && inputNewUsername) {
-                const acc = getStoredAccount();
-                inputNewUsername.value = acc && acc.username ? acc.username : "";
-                inputNewUsername.focus();
-            }
-        });
+    function toggleEditUsernameBox() {
+        if (!boxEditUsername) return;
+        boxEditUsername.classList.toggle("hidden");
+        if (!boxEditUsername.classList.contains("hidden") && inputNewUsername) {
+            const acc = getStoredAccount();
+            inputNewUsername.value = acc && acc.username ? acc.username : "";
+            inputNewUsername.focus();
+            inputNewUsername.select();
+        }
+    }
+
+    if (btnShowEditUsername) {
+        btnShowEditUsername.addEventListener("click", toggleEditUsernameBox);
+    }
+    if (btnShowEditUsernameBottom) {
+        btnShowEditUsernameBottom.addEventListener("click", toggleEditUsernameBox);
     }
 
     if (btnCancelEditUsername && boxEditUsername) {
@@ -1702,6 +1708,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const btnNavPrivacy = document.getElementById("btn-nav-privacy");
         if (btnNavPrivacy) btnNavPrivacy.addEventListener("click", (e) => triggerPrivacy(e));
 
+        // Note: btn-wipe-data moved to upcoming Settings modal
         const btnWipeData = document.getElementById("btn-wipe-data");
         if (btnWipeData) {
             btnWipeData.addEventListener("click", () => {
@@ -1779,6 +1786,9 @@ document.addEventListener("DOMContentLoaded", () => {
         }, { passive: true });
     }
 
-    // Launch App
+    // Launch App: register event listeners synchronously on millisecond 0
+    setupEventListeners();
+    initTheme();
+    checkAccountState();
     init();
 });
