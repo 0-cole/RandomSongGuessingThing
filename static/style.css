@@ -1576,3 +1576,234 @@ body.light-theme kbd {
     -ms-overflow-style: none;
     scrollbar-width: none;
 }
+
+
+/* -------------------------------------------------------------
+   Mobile Responsive Architecture (iPhone & Mobile Touchscreens)
+---------------------------------------------------------------- */
+@media (max-width: 600px) {
+    .app-layout {
+        padding: 10px 14px 16px !important;
+        padding-top: max(10px, env(safe-area-inset-top)) !important;
+        padding-bottom: max(16px, env(safe-area-inset-bottom)) !important;
+        min-height: 100dvh;
+    }
+
+    /* 1. Header & Navigation: 2-Row Clean Mobile Header */
+    .navbar {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        padding-bottom: 10px !important;
+        gap: 8px 10px !important;
+    }
+
+    .nav-center {
+        order: 1 !important;
+        justify-self: flex-start !important;
+        text-align: left !important;
+    }
+
+    .logo {
+        font-size: 1.15rem !important;
+        font-weight: 800 !important;
+        white-space: nowrap !important;
+        letter-spacing: 0.04em !important;
+    }
+
+    .nav-right {
+        order: 2 !important;
+        gap: 6px !important;
+        justify-self: flex-end !important;
+    }
+
+    .nav-left {
+        order: 3 !important;
+        width: 100% !important;
+        justify-content: center !important;
+        margin-top: 2px !important;
+    }
+
+    .nav-left .nav-pill {
+        width: 100% !important;
+        justify-content: center !important;
+        padding: 7px 12px !important;
+        font-size: 0.8rem !important;
+    }
+
+    #active-pool-label {
+        max-width: 200px !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+    }
+
+    /* Compact Auth Pill on mobile */
+    .nav-auth-pill {
+        padding: 5px 9px !important;
+        max-width: 105px !important;
+    }
+
+    #auth-username-label {
+        max-width: 60px !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+        font-size: 0.75rem !important;
+    }
+
+    .streak-pill {
+        padding: 5px 8px !important;
+        font-size: 0.78rem !important;
+    }
+
+    .icon-button {
+        width: 32px !important;
+        height: 32px !important;
+    }
+
+    /* 2. Game Progress Banner */
+    .game-container {
+        gap: 10px !important;
+        margin-top: 8px !important;
+    }
+
+    .game-progress-card {
+        padding: 8px 12px !important;
+        gap: 6px !important;
+    }
+
+    .progress-playlist-name {
+        max-width: 130px !important;
+        font-size: 0.74rem !important;
+    }
+
+    .game-counter-badge {
+        font-size: 0.74rem !important;
+        padding: 2px 7px !important;
+    }
+
+    /* 3. Player Card */
+    .player-card {
+        padding: 12px 14px !important;
+        gap: 10px !important;
+    }
+
+    .visualizer-container {
+        height: 32px !important;
+    }
+
+    .btn-circle-play {
+        width: 54px !important;
+        height: 54px !important;
+    }
+
+    .btn-circle-play svg {
+        width: 24px !important;
+        height: 24px !important;
+    }
+
+    .playback-info {
+        font-size: 0.85rem !important;
+        right: 4px !important;
+    }
+
+    #label-playback-time {
+        font-size: 1.0rem !important;
+    }
+
+    .segment {
+        height: 24px !important;
+    }
+
+    .segment .seg-label {
+        font-size: 0.58rem !important;
+    }
+
+    /* 4. Guess Slots (Compact for Mobile) */
+    .guesses-list {
+        gap: 5px !important;
+    }
+
+    .guess-row {
+        height: 38px !important;
+        padding: 0 10px !important;
+        font-size: 0.82rem !important;
+        border-radius: 6px !important;
+    }
+
+    .guess-row .row-num {
+        font-size: 0.7rem !important;
+        width: 14px !important;
+    }
+
+    /* 5. Action Dock (Search and buttons) */
+    .action-dock {
+        gap: 8px !important;
+        padding-top: 4px !important;
+    }
+
+    .search-box-wrapper input {
+        height: 46px !important;
+        font-size: 0.88rem !important;
+        padding-left: 38px !important;
+        border-radius: var(--radius-sm) !important;
+    }
+
+    .search-box-wrapper .search-icon {
+        left: 10px !important;
+        width: 18px !important;
+        height: 18px !important;
+    }
+
+    .btn {
+        height: 44px !important;
+        font-size: 0.88rem !important;
+        border-radius: var(--radius-sm) !important;
+    }
+
+    .dock-footer {
+        flex-direction: column !important;
+        gap: 4px !important;
+        text-align: center !important;
+    }
+
+    .hotkey-hint {
+        display: none !important; /* Hide keyboard shortcut hints on mobile */
+    }
+
+    /* 6. Modals on Mobile */
+    .modal-overlay {
+        padding: 12px !important;
+        align-items: flex-end !important; /* Mobile bottom sheet style */
+    }
+
+    .modal-card {
+        padding: 20px 16px !important;
+        max-height: 88vh !important;
+        border-radius: var(--radius-lg) var(--radius-lg) 0 0 !important;
+        margin-bottom: 0 !important;
+    }
+
+    .difficulty-grid, .playlists-grid {
+        grid-template-columns: 1fr !important;
+    }
+
+    .reveal-song-hero {
+        flex-direction: column !important;
+        text-align: center !important;
+        gap: 12px !important;
+    }
+
+    .cover-wrapper {
+        width: 110px !important;
+        height: 110px !important;
+        margin: 0 auto !important;
+    }
+
+    .reveal-actions {
+        grid-template-columns: 1fr !important;
+        gap: 8px !important;
+    }
+}
