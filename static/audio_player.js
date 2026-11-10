@@ -8,12 +8,21 @@ class MicroAudioEngine {
         this.audioBuffer = null;
         this.currentSource = null;
         this.analyser = null;
+        this.gainNode = null;
         this.isPlaying = false;
+        this.isFadingOut = false;
+        this.isLooping = false;
         this.playStartTime = 0;
         this.startOffset = 0;
+        this.highlightOffset = 0;
         this.currentDuration = 0.1;
         this.currentTrackId = null;
         this.animFrameId = null;
+        this.fadeTimeoutId = null;
+        this.pendingHighlight = null;
+        this.pendingPlayFull = null;
+        this.pendingSnippet = null;
+        this.isLoading = false;
 
         // Callback hooks
         this.onPlayStart = null;
@@ -27,22 +36,54 @@ class MicroAudioEngine {
             this.ctx = new AudioContext();
             this.analyser = this.ctx.createAnalyser();
             this.analyser.fftSize = 128;
+            this.gainNode = this.ctx.createGain();
+            this.gainNode.gain.setValueAtTime(1.0, this.ctx.currentTime);
+            this.analyser.connect(this.gainNode);
+            this.gainNode.connect(this.ctx.destination);
         }
         if (this.ctx.state === "suspended") {
             this.ctx.resume();
         }
     }
 
+    async ensureContextRunning() {
+        this.initContext();
+        if (this.ctx && this.ctx.state === "suspended") {
+            try {
+                await this.ctx.resume();
+            } catch (e) {
+                console.warn("Could not resume AudioContext:", e);
+            }
+        }
+    }
+
     async loadTrack(trackId, fallbackQuery = "") {
         this.initContext();
         if (this.currentTrackId === trackId && this.audioBuffer) {
+            if (this.pendingSnippet) {
+                const s = this.pendingSnippet;
+                this.pendingSnippet = null;
+                this.playSnippet(s.seconds, s.fromOffset, s.loop);
+            }
+            if (this.pendingHighlight) {
+                const sec = this.pendingHighlight;
+                this.pendingHighlight = null;
+                this.playHighlight(sec);
+            }
+            if (this.pendingPlayFull) {
+                const p = this.pendingPlayFull;
+                this.pendingPlayFull = null;
+                this.playFull(p.fromHighlight, p.loop);
+            }
             return true; // Already loaded
         }
 
         this.stop();
+        this.isLoading = true;
         this.currentTrackId = trackId;
         this.audioBuffer = null;
         this.startOffset = 0;
+        this.highlightOffset = 0;
 
         let arrayBuffer = null;
 
@@ -51,6 +92,11 @@ class MicroAudioEngine {
             const res = await fetch(`/api/audio/${encodeURIComponent(trackId)}`);
             if (res.ok) {
                 arrayBuffer = await res.arrayBuffer();
+            } else if (!fallbackQuery) {
+                console.error("Failed to fetch audio stream:", res.status);
+                this.isLoading = false;
+                return false;
+            }
             }
         } catch (e) {
             // Local backend not reachable (e.g. cloud / Vercel deployment)
@@ -94,15 +140,34 @@ class MicroAudioEngine {
             const detectedOffset = this.detectAudioStartOffset(this.audioBuffer);
             if (detectedOffset === null) {
                 console.warn("Track buffer appears completely silent, skipping track.");
+                this.isLoading = false;
                 return false;
             }
             this.startOffset = detectedOffset;
+            this.highlightOffset = this.detectAudioHighlightOffset(this.audioBuffer);
+            this.isLoading = false;
             console.log(
-                `Audio decoded successfully: ${this.audioBuffer.duration.toFixed(2)}s (startOffset: ${this.startOffset.toFixed(2)}s)`
+                `Audio decoded successfully: ${this.audioBuffer.duration.toFixed(2)}s (startOffset: ${this.startOffset.toFixed(2)}s, highlightOffset: ${this.highlightOffset.toFixed(2)}s)`
             );
+            if (this.pendingSnippet) {
+                const s = this.pendingSnippet;
+                this.pendingSnippet = null;
+                this.playSnippet(s.seconds, s.fromOffset, s.loop);
+            }
+            if (this.pendingHighlight) {
+                const sec = this.pendingHighlight;
+                this.pendingHighlight = null;
+                this.playHighlight(sec);
+            }
+            if (this.pendingPlayFull) {
+                const p = this.pendingPlayFull;
+                this.pendingPlayFull = null;
+                this.playFull(p.fromHighlight, p.loop);
+            }
             return true;
         } catch (err) {
             console.error("Error decoding audio stream:", err);
+            this.isLoading = false;
             return false;
         }
     }
@@ -201,32 +266,178 @@ class MicroAudioEngine {
         return 0;
     }
 
-    playSnippet(seconds) {
+    /**
+     * Detects the energetic "highlight" of the song (e.g. chorus / hook / drop)
+     * by scanning for the window with peak sustained RMS energy, biasing towards
+     * the actual chorus/hook section rather than early intro transients.
+     */
+    detectAudioHighlightOffset(buffer) {
+        if (!buffer || buffer.duration <= 0) return 0;
+        const sampleRate = buffer.sampleRate;
+        const totalSamples = buffer.length;
+        const numChannels = buffer.numberOfChannels;
+        const channels = [];
+        for (let c = 0; c < numChannels; c++) {
+            channels.push(buffer.getChannelData(c));
+        }
+
+        const computeRms = (startSample, count) => {
+            const end = Math.min(totalSamples, startSample + count);
+            const len = end - startSample;
+            if (len <= 0) return 0;
+            let sumSq = 0;
+            let n = 0;
+            for (let i = startSample; i < end; i += 8) {
+                let s = Math.abs(channels[0][i]);
+                if (numChannels > 1) {
+                    const s2 = Math.abs(channels[1][i]);
+                    if (s2 > s) s = s2;
+                }
+                sumSq += s * s;
+                n++;
+            }
+            return n > 0 ? Math.sqrt(sumSq / n) : 0;
+        };
+
+        const duration = buffer.duration;
+        if (duration <= 6.0) {
+            return this.startOffset || 0;
+        }
+
+        // Measurement window for sustained hook/chorus energy (3.0 seconds)
+        const minPlayableSpan = Math.min(5.0, duration * 0.4);
+        const maxStartSec = Math.max(0, duration - minPlayableSpan);
+        const windowSec = Math.min(3.0, Math.max(1.5, duration * 0.15));
+        const windowSamples = Math.floor(sampleRate * windowSec);
+        const stepSec = 0.25;
+        const stepSamples = Math.floor(sampleRate * stepSec);
+        const maxStartSample = Math.floor(maxStartSec * sampleRate);
+
+        // Compute baseline RMS across the whole buffer to establish peak reference
+        let globalPeakRms = 0;
+        for (let s = 0; s + windowSamples <= totalSamples && s <= maxStartSample; s += stepSamples) {
+            const rms = computeRms(s, windowSamples);
+            if (rms > globalPeakRms) {
+                globalPeakRms = rms;
+            }
+        }
+
+        if (globalPeakRms <= 0.001) {
+            return this.startOffset || 0;
+        }
+
+        // The chorus / hook is rarely in the initial intro or first 10-14 seconds.
+        // If the buffer has sufficient length (> 16s), prefer windows starting after
+        // the intro/first verse (e.g. from 12s onwards, or startOffset + 7s).
+        const preferChorusAfterSec = duration > 16.0 
+            ? Math.min(Math.max(12.0, (this.startOffset || 0) + 7.0), maxStartSec)
+            : (this.startOffset || 0);
+        const preferChorusSample = Math.floor(preferChorusAfterSec * sampleRate);
+
+        let bestChorusSample = null;
+        let bestChorusRms = -1;
+
+        let bestOverallSample = 0;
+        let bestOverallRms = -1;
+
+        for (let s = 0; s + windowSamples <= totalSamples && s <= maxStartSample; s += stepSamples) {
+            const rms = computeRms(s, windowSamples);
+            if (rms > bestOverallRms) {
+                bestOverallRms = rms;
+                bestOverallSample = s;
+            }
+            if (s >= preferChorusSample && rms > bestChorusRms) {
+                bestChorusRms = rms;
+                bestChorusSample = s;
+            }
+        }
+
+        // If the section after intro has strong energy (at least 82% of global peak),
+        // that's unambiguously the chorus/drop! Use it over an intro transient.
+        let rawOffsetSample = (bestChorusSample !== null && bestChorusRms >= globalPeakRms * 0.82)
+            ? bestChorusSample
+            : bestOverallSample;
+
+        // Fine-tune to the nearest musical onset / beat near the chorus start
+        // so micro-snippets (0.1s, 0.25s) hit crisp vocal/instrumental attacks.
+        const win40ms = Math.max(1, Math.floor(sampleRate * 0.04));
+        const win100ms = Math.max(1, Math.floor(sampleRate * 0.1));
+        const step10ms = Math.max(1, Math.floor(sampleRate * 0.01));
+        const onsetThreshold = Math.max(0.016, globalPeakRms * 0.22);
+
+        const searchStartSample = Math.max(0, rawOffsetSample - Math.floor(sampleRate * 0.15));
+        const searchEndSample = Math.min(totalSamples - win100ms, rawOffsetSample + Math.floor(sampleRate * 0.5));
+
+        for (let s = searchStartSample; s <= searchEndSample; s += step10ms) {
+            if (computeRms(s, win40ms) >= onsetThreshold * 0.85 && computeRms(s, win100ms) >= onsetThreshold) {
+                return s / sampleRate;
+            }
+        }
+
+        return rawOffsetSample / sampleRate;
+    }
+
+    async playSnippet(seconds, fromOffset = null, loop = false) {
+        await this.ensureContextRunning();
+
         if (!this.audioBuffer || !this.ctx) {
-            console.warn("Audio buffer not ready for playback");
+            console.warn("Audio buffer not ready yet, queueing snippet playback...");
+            this.pendingSnippet = { seconds, fromOffset, loop };
             return;
         }
 
-        this.stop();
-        this.initContext();
+        this.pendingSnippet = null;
 
-        const offset = this.startOffset || 0;
+        if (this.fadeTimeoutId) {
+            clearTimeout(this.fadeTimeoutId);
+            this.fadeTimeoutId = null;
+        }
+        this.isFadingOut = false;
+
+        this.stop();
+        await this.ensureContextRunning();
+
+        // Default to the song's energetic chorus / hook highlight (Spotify preview style)
+        // rather than repetitive intro bars, falling back to audible startOffset if needed.
+        const defaultOffset = (this.highlightOffset !== null && this.highlightOffset !== undefined)
+            ? this.highlightOffset
+            : (this.startOffset || 0);
+        const offset = fromOffset !== null ? fromOffset : defaultOffset;
         const availableDuration = Math.max(0.1, this.audioBuffer.duration - offset);
         this.currentDuration = Math.min(seconds, availableDuration);
         this.isPlaying = true;
+        this.isLooping = !!loop;
+
+        if (this.gainNode && this.ctx) {
+            try {
+                this.gainNode.gain.cancelScheduledValues(this.ctx.currentTime);
+                this.gainNode.gain.setValueAtTime(1.0, this.ctx.currentTime);
+            } catch (e) {}
+        }
 
         this.currentSource = this.ctx.createBufferSource();
         this.currentSource.buffer = this.audioBuffer;
 
-        // Connect source -> analyser -> master output
-        this.currentSource.connect(this.analyser);
-        this.analyser.connect(this.ctx.destination);
+        if (this.isLooping) {
+            this.currentSource.loop = true;
+            this.currentSource.loopStart = offset;
+            this.currentSource.loopEnd = offset + this.currentDuration;
+        }
 
-        const startTime = this.ctx.currentTime;
+        // Connect source -> analyser (which connects to gainNode -> destination)
+        this.currentSource.connect(this.analyser);
+
+        // Schedule playback with a tiny 12ms lookahead so hardware buffer has zero starvation
+        const now = this.ctx.currentTime;
+        const startTime = now + 0.012;
         this.playStartTime = startTime;
 
-        // Start playback from the detected audible startOffset for currentDuration seconds
-        this.currentSource.start(startTime, offset, this.currentDuration);
+        // Start playback from the specified offset
+        if (this.isLooping) {
+            this.currentSource.start(startTime, offset);
+        } else {
+            this.currentSource.start(startTime, offset, this.currentDuration);
+        }
 
         if (this.onPlayStart) {
             this.onPlayStart(this.currentDuration);
@@ -235,40 +446,125 @@ class MicroAudioEngine {
         // Animate playhead progress
         const updateProgress = () => {
             if (!this.isPlaying) return;
-            const elapsed = this.ctx.currentTime - this.playStartTime;
-            const progress = Math.min(elapsed / this.currentDuration, 1.0);
+            const elapsed = Math.max(0, this.ctx.currentTime - this.playStartTime);
             
-            if (this.onPlayProgress) {
-                this.onPlayProgress(progress, elapsed);
-            }
-
-            if (elapsed >= this.currentDuration) {
-                this.stop();
-            } else {
+            if (this.isLooping) {
+                const loopElapsed = this.currentDuration > 0 ? (elapsed % this.currentDuration) : 0;
+                const progress = this.currentDuration > 0 ? (loopElapsed / this.currentDuration) : 0;
+                if (this.onPlayProgress) {
+                    this.onPlayProgress(progress, loopElapsed);
+                }
                 this.animFrameId = requestAnimationFrame(updateProgress);
+            } else {
+                const progress = Math.min(elapsed / this.currentDuration, 1.0);
+                if (this.onPlayProgress) {
+                    this.onPlayProgress(progress, elapsed);
+                }
+
+                // Web Audio's onended will handle stopping naturally. We only use a safe backstop
+                // of +0.06s so we never abruptly cut off 0.1s snippets before the audio hardware renders them.
+                if (elapsed >= this.currentDuration + 0.06) {
+                    this.stop();
+                } else {
+                    this.animFrameId = requestAnimationFrame(updateProgress);
+                }
             }
         };
 
         this.animFrameId = requestAnimationFrame(updateProgress);
 
         this.currentSource.onended = () => {
-            if (this.isPlaying) {
+            if (this.isPlaying && !this.isFadingOut && !this.isLooping) {
                 this.stop();
             }
         };
     }
 
-    playFull() {
-        if (!this.audioBuffer) return;
-        const offset = this.startOffset || 0;
-        this.playSnippet(Math.max(0.1, this.audioBuffer.duration - offset));
+    async playHighlight(seconds = null, loop = false) {
+        await this.ensureContextRunning();
+        if (!this.audioBuffer) {
+            this.pendingHighlight = seconds || true;
+            return;
+        }
+        this.pendingHighlight = null;
+        const offset = (this.highlightOffset !== null && this.highlightOffset !== undefined) ? this.highlightOffset : (this.startOffset || 0);
+        const available = Math.max(0.1, this.audioBuffer.duration - offset);
+        const playDuration = (seconds !== null && seconds !== undefined) ? Math.min(seconds, available) : available;
+        this.playSnippet(playDuration, offset, loop);
+    }
+
+    async playFull(fromHighlight = false, loop = true) {
+        await this.ensureContextRunning();
+        if (!this.audioBuffer) {
+            this.pendingPlayFull = { fromHighlight, loop };
+            return;
+        }
+        this.pendingPlayFull = null;
+        const offset = (fromHighlight && this.highlightOffset !== null && this.highlightOffset !== undefined)
+            ? this.highlightOffset
+            : (this.startOffset || 0);
+        const available = Math.max(0.1, this.audioBuffer.duration - offset);
+        this.playSnippet(available, offset, loop);
+    }
+
+    fadeOut(durationSec = 0.8) {
+        return new Promise((resolve) => {
+            if (!this.isPlaying || !this.gainNode || !this.ctx) {
+                this.stop();
+                resolve();
+                return;
+            }
+
+            if (this.isFadingOut) {
+                resolve();
+                return;
+            }
+            this.isFadingOut = true;
+
+            try {
+                const now = this.ctx.currentTime;
+                this.gainNode.gain.cancelScheduledValues(now);
+                this.gainNode.gain.setValueAtTime(this.gainNode.gain.value, now);
+                this.gainNode.gain.linearRampToValueAtTime(0.0001, now + durationSec);
+            } catch (e) {
+                this.stop();
+                resolve();
+                return;
+            }
+
+            this.fadeTimeoutId = setTimeout(() => {
+                this.fadeTimeoutId = null;
+                this.isFadingOut = false;
+                this.stop();
+                resolve();
+            }, durationSec * 1000);
+        });
     }
 
     stop() {
+        this.isLooping = false;
+        this.pendingPlayFull = null;
+        this.pendingHighlight = null;
+        this.pendingSnippet = null;
+
+        if (this.fadeTimeoutId) {
+            clearTimeout(this.fadeTimeoutId);
+            this.fadeTimeoutId = null;
+        }
+        this.isFadingOut = false;
+
         if (this.animFrameId) {
             cancelAnimationFrame(this.animFrameId);
             this.animFrameId = null;
         }
+
+        if (this.gainNode && this.ctx) {
+            try {
+                this.gainNode.gain.cancelScheduledValues(this.ctx.currentTime);
+                this.gainNode.gain.setValueAtTime(1.0, this.ctx.currentTime);
+            } catch (e) {}
+        }
+
         if (this.currentSource) {
             try {
                 this.currentSource.stop();
@@ -276,6 +572,7 @@ class MicroAudioEngine {
             } catch (e) {}
             this.currentSource = null;
         }
+
         if (this.isPlaying) {
             this.isPlaying = false;
             if (this.onPlayEnd) {
@@ -284,11 +581,14 @@ class MicroAudioEngine {
         }
     }
 
-    toggle(seconds) {
+    async toggle(seconds) {
         if (this.isPlaying) {
             this.stop();
+        } else if (this.pendingSnippet) {
+            this.pendingSnippet = null;
+            this.stop();
         } else {
-            this.playSnippet(seconds);
+            await this.playSnippet(seconds);
         }
     }
 
