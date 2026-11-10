@@ -1499,8 +1499,8 @@ kbd {
     color: var(--color-text-subtle);
     margin-top: 14px;
     padding-bottom: 12px;
-    pointer-events: none;
-    user-select: none;
+    pointer-events: auto !important;
+    user-select: auto !important;
 }
 
 /* Theme Toggle Button */
@@ -1892,4 +1892,57 @@ body.light-theme kbd {
 .btn-danger:hover {
     background: rgba(226, 80, 80, 0.25) !important;
     border-color: #ff6b6b !important;
+}
+
+
+/* ----------------- Legal, Privacy & Terms Guarantee ----------------- */
+.page-footnote {
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 16px 0;
+    margin-top: 16px;
+    font-size: 0.78rem;
+    color: var(--color-text-subtle);
+    position: relative;
+    z-index: 100;
+    pointer-events: auto;
+    text-align: center;
+    flex-wrap: wrap;
+}
+
+.footer-legal-link, .btn-legal-link {
+    background: none;
+    border: none;
+    color: var(--color-spotify);
+    text-decoration: underline;
+    cursor: pointer;
+    font-size: 0.78rem;
+    font-weight: 600;
+    padding: 4px 8px;
+    border-radius: 4px;
+    pointer-events: auto;
+    display: inline-block;
+    transition: opacity 0.2s;
+}
+
+.footer-legal-link:hover, .btn-legal-link:hover {
+    opacity: 0.8;
+}
+
+#modal-privacy {
+    z-index: 9999 !important;
+}
+
+#modal-privacy:not(.hidden) {
+    display: flex !important;
+}
+
+#modal-privacy.active {
+    display: flex !important;
+}
+
+#modal-privacy.hidden {
+    display: none !important;
 }

@@ -541,6 +541,46 @@ document.addEventListener("DOMContentLoaded", () => {
         const cookie = localStorage.getItem("spotiless_sp_dc");
         const guest = sessionStorage.getItem("spotiless_guest_session");
 
+        const userTierBadge = document.getElementById("user-tier-badge");
+        const spotifyLinkPill = document.getElementById("spotify-link-pill");
+        const boxSpotifyUnlinked = document.getElementById("box-spotify-unlinked");
+        const boxSpotifyLinked = document.getElementById("box-spotify-linked");
+        const userPlaylistsStatusMsg = document.getElementById("user-playlists-status-msg");
+
+        if (cookie) {
+            if (userTierBadge) {
+                userTierBadge.textContent = "Spotify Linked 🍪";
+                userTierBadge.style.background = "var(--color-spotify)";
+                userTierBadge.style.color = "#000";
+            }
+            if (spotifyLinkPill) {
+                spotifyLinkPill.textContent = "✓ Connected";
+                spotifyLinkPill.style.background = "rgba(29, 185, 84, 0.2)";
+                spotifyLinkPill.style.color = "var(--color-spotify)";
+            }
+            if (boxSpotifyUnlinked) boxSpotifyUnlinked.classList.add("hidden");
+            if (boxSpotifyLinked) boxSpotifyLinked.classList.remove("hidden");
+            if (userPlaylistsStatusMsg) {
+                userPlaylistsStatusMsg.innerHTML = '<p style="margin: 0 0 6px 0; font-weight: 700; color: #fff; font-size: 0.9rem;">Spotify Linked 🍪</p><p style="margin: 0 0 12px 0; font-size: 0.8rem; color: var(--color-text-muted);">Paste any playlist URL above to load songs instantly, or run desktop native mode to sync your created playlists.</p>';
+            }
+        } else {
+            if (userTierBadge) {
+                userTierBadge.textContent = (acc && acc.username) ? "Spotify Not Linked" : "Guest";
+                userTierBadge.style.background = "rgba(255, 255, 255, 0.15)";
+                userTierBadge.style.color = "#ddd";
+            }
+            if (spotifyLinkPill) {
+                spotifyLinkPill.textContent = "Not Linked";
+                spotifyLinkPill.style.background = "rgba(255, 107, 107, 0.2)";
+                spotifyLinkPill.style.color = "#ff6b6b";
+            }
+            if (boxSpotifyUnlinked) boxSpotifyUnlinked.classList.remove("hidden");
+            if (boxSpotifyLinked) boxSpotifyLinked.classList.add("hidden");
+            if (userPlaylistsStatusMsg) {
+                userPlaylistsStatusMsg.innerHTML = '<p style="margin: 0 0 6px 0; font-weight: 700; color: #fff; font-size: 0.9rem;">No Spotify Account Linked</p><p style="margin: 0 0 12px 0; font-size: 0.8rem; color: var(--color-text-muted);">Connect your Spotify account to load and play your personal playlists here.</p><button type="button" class="btn btn-primary btn-sm" onclick="document.getElementById(\'modal-mode\').classList.add(\'hidden\'); document.getElementById(\'modal-auth\').classList.remove(\'hidden\');" style="font-weight: 800; font-size: 0.8rem;">🔗 Connect Spotify Account</button>';
+            }
+        }
+
         if (acc && acc.username) {
             authStatusDot.className = "dot-connected";
             authUsernameLabel.textContent = acc.username;
@@ -1318,6 +1358,32 @@ document.addEventListener("DOMContentLoaded", () => {
     if (formLocalAccount) {
         formLocalAccount.addEventListener("submit", (e) => {
             e.preventDefault();
+            const usernameInput = document.getElementById("acc-username-input");
+            const passwordInput = document.getElementById("acc-password-input");
+            const u = (usernameInput?.value || "").trim();
+            const p = (passwordInput?.value || "").trim();
+            if (!u || !p) {
+                showToast("Please enter a username and password");
+                return;
+            }
+            try {
+                localStorage.setItem("spotiless_account", JSON.stringify({ username: u, created_at: Date.now() }));
+                checkAccountState();
+                showToast(`Welcome, ${u}! Link Spotify below to sync your playlists.`);
+                const welcomeBanner = document.getElementById("account-welcome-banner");
+                if (welcomeBanner) welcomeBanner.classList.remove("hidden");
+                // Focus the cookie input to guide them smoothly
+                const inputSpdc = document.getElementById("input-connected-cookie-spdc");
+                if (inputSpdc) {
+                    setTimeout(() => inputSpdc.focus(), 300);
+                }
+            } catch (err) {
+                showToast("Failed to save account");
+            }
+            return;
+        });
+        const _ignoredFormSubmit = function() {
+            e.preventDefault();
             const user = accUserInput.value.trim();
             const pass = accPassInput.value;
             if (!user || !pass) return;
@@ -1347,6 +1413,42 @@ document.addEventListener("DOMContentLoaded", () => {
     // Cookie Linking
     const inputCookieSpdc = document.getElementById("input-cookie-spdc");
     const btnSaveCookie = document.getElementById("btn-save-cookie");
+    const btnSaveConnectedCookie = document.getElementById("btn-save-connected-cookie");
+    const inputConnectedCookieSpdc = document.getElementById("input-connected-cookie-spdc");
+    const btnUnlinkSpotify = document.getElementById("btn-unlink-spotify");
+
+    if (btnSaveConnectedCookie) {
+        btnSaveConnectedCookie.addEventListener("click", () => {
+            const val = (inputConnectedCookieSpdc?.value || "").trim();
+            if (!val) {
+                showToast("Please paste your sp_dc cookie");
+                return;
+            }
+            try {
+                localStorage.setItem("spotiless_sp_dc", val);
+                showToast("Spotify linked successfully! 🍪");
+                checkAccountState();
+                if (inputConnectedCookieSpdc) inputConnectedCookieSpdc.value = "";
+            } catch (e) {
+                showToast("Failed to save cookie");
+            }
+        });
+    }
+
+    if (btnUnlinkSpotify) {
+        btnUnlinkSpotify.addEventListener("click", () => {
+            try {
+                localStorage.removeItem("spotiless_sp_dc");
+                showToast("Spotify unlinked");
+                checkAccountState();
+            } catch (e) {
+                showToast("Failed to unlink Spotify");
+            }
+        });
+    }
+    const btnSaveConnectedCookie = document.getElementById("btn-save-connected-cookie");
+    const inputConnectedCookieSpdc = document.getElementById("input-connected-cookie-spdc");
+    const btnUnlinkSpotify = document.getElementById("btn-unlink-spotify");
     if (btnSaveCookie && inputCookieSpdc) {
         btnSaveCookie.addEventListener("click", () => {
             const val = inputCookieSpdc.value.trim();
@@ -1542,13 +1644,25 @@ document.addEventListener("DOMContentLoaded", () => {
         if (btnThemeToggle) btnThemeToggle.addEventListener("click", toggleTheme);
 
         // Privacy & Data Deletion
-        const btnOpenPrivacy = document.getElementById("btn-open-privacy");
         const modalPrivacy = document.getElementById("modal-privacy");
-        if (btnOpenPrivacy && modalPrivacy) {
-            btnOpenPrivacy.addEventListener("click", () => {
+        const triggerPrivacy = () => {
+            if (window.openPrivacyModal) {
+                window.openPrivacyModal();
+            } else if (modalPrivacy) {
                 modalPrivacy.classList.remove("hidden");
-            });
-        }
+                modalPrivacy.classList.add("active");
+                modalPrivacy.style.setProperty("display", "flex", "important");
+            }
+        };
+
+        const btnOpenPrivacy = document.getElementById("btn-open-privacy");
+        if (btnOpenPrivacy) btnOpenPrivacy.addEventListener("click", triggerPrivacy);
+
+        const btnDockPrivacy = document.getElementById("btn-dock-privacy");
+        if (btnDockPrivacy) btnDockPrivacy.addEventListener("click", triggerPrivacy);
+
+        const btnNavPrivacy = document.getElementById("btn-nav-privacy");
+        if (btnNavPrivacy) btnNavPrivacy.addEventListener("click", triggerPrivacy);
 
         const btnWipeData = document.getElementById("btn-wipe-data");
         if (btnWipeData) {

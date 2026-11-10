@@ -2,7 +2,7 @@
 
 ## 1. Executive Summary & High-Level Objective
 - **Project**: Spotiless (Songless — Spotify Edition), an endless music guessing game inspired by *Songless* (Lessgames) with microsecond-accurate snippet intervals (0.1s → 0.25s → 0.5s → 1.0s → 2.0s → 5.0s).
-- **Current Version**: `v1.2.4`
+- **Current Version**: `v1.2.6`
 - **Official Branding**: **Spoti-Less** in-app / **Spotiless** for domain and repository links.
 - **Dual Architecture**:
   1. **Desktop Native Mode (`launcher.py` / `127.0.0.1:4321`)**: 100% Native Spotify Shannon cipher streaming over TCP port 4070 (`ap-gae2.spotify.com:4070`) using cached Librespot playback tokens and personal Spotify user libraries.
@@ -17,15 +17,19 @@
 - **20-Point Legal Protection Checklist**:
   - Privacy policy, Fair Use terms, zero-cookie policy, COPPA under-13 notice, 1-click Right to Erasure (`#btn-wipe-data`).
   - High-contrast responsive mobile layout with safe-area insets.
+  - Ubiquitous accessibility: Terms of Service & Privacy Policy accessible via top navigation shield button (`#btn-nav-privacy`), action dock footer (`#btn-dock-privacy`), account onboarding dialog (`#modal-auth`), and page footer (`#btn-open-privacy`).
 
-## 3. Recent Modifications & Verified State (`v1.2.4`)
-- [`backend/app.py`](file:///d:/DOWNLOAD/RandomSongGuessingThing/backend/app.py): Bumped version to `v1.2.4`.
+## 3. Recent Modifications & Verified State (`v1.2.6`)
+- [`backend/app.py`](file:///d:/DOWNLOAD/RandomSongGuessingThing/backend/app.py): Bumped version to `v1.2.6`.
+- [`static/style.css`](file:///d:/DOWNLOAD/RandomSongGuessingThing/static/style.css):
+  - Fixed root cause of unclickable Privacy & Terms link: removed legacy `pointer-events: none;` and `user-select: none;` on `.page-footnote`.
+  - Added CSS rule guarantees: `#modal-privacy` forced to `z-index: 9999 !important;`, `pointer-events: auto !important;`, and `display: flex !important;` when open.
 - [`static/index.html`](file:///d:/DOWNLOAD/RandomSongGuessingThing/static/index.html):
-  - Added cache-busting meta tags (`no-cache`, `no-store`).
-  - Added 1-tap auto-reset URL listener in `<head>` (`?reset=1`).
-  - Added direct inline `onclick` handler to `#btn-open-auth`.
-  - Bumped asset version query strings to `?v=1.2.4`.
+  - Added global `openPrivacyModal()` and `closePrivacyModal()` helper functions in `<head>` ensuring immediate, crash-proof execution.
+  - Added `#btn-nav-privacy` icon button directly in the top navbar.
+  - Added `#btn-dock-privacy` link right inside `.dock-footer` next to "Give up / Reveal Song".
+  - Added Privacy Policy & Terms of Service link inside the Account Onboarding dialog (`#modal-auth`).
+  - Fixed dismiss handlers on `#modal-privacy` overlay backdrop and close button.
+  - Bumped asset query strings to `?v=1.2.6`.
 - [`static/app.js`](file:///d:/DOWNLOAD/RandomSongGuessingThing/static/app.js):
-  - Fixed audio recursion loop in `applyGameState`.
-  - Added account creation / sign-in state management.
-  - Added Spotify `sp_dc` cookie linking and guest session management.
+  - Added event listeners for `#btn-open-privacy`, `#btn-dock-privacy`, and `#btn-nav-privacy` to invoke `openPrivacyModal()`.
