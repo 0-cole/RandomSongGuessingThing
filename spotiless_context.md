@@ -18,7 +18,7 @@
 
 ## 1. Executive Summary & High-Level Objective
 - **Project**: Spotiless (Songless — Spotify Edition), an endless music guessing game inspired by *Songless* (Lessgames) with microsecond-accurate snippet intervals (0.1s → 0.25s → 0.5s → 1.0s → 2.0s → 5.0s).
-- **Current Version**: `v1.3.2` (Unified GitHub Cloud & Local Native Release)
+- **Current Version**: `v1.3.3` (Unified GitHub Cloud & Local Native Release)
 - **Official Branding**: **Spoti-Less** in-app / **Spotiless** for domain and repository links.
 - **Dual Architecture**:
   1. **Desktop Native Mode (`launcher.py` / `127.0.0.1:4321`)**: 100% Native Spotify Shannon cipher streaming over TCP port 4070 (`ap-gae2.spotify.com:4070`) using cached Librespot playback tokens and personal Spotify user libraries. Works even through school firewalls and FortiGuard blocks.
@@ -44,19 +44,16 @@
   - Ubiquitous Terms of Service & Privacy Policy modal (`#modal-privacy`) accessible via top navigation shield button (`#btn-nav-privacy`) and footer.
   - Data deletion copy preserved; wipe button earmarked for upcoming Settings menu.
 
-## 3. Recent Modifications & Verified State (`v1.3.2`)
-- [`backend/app.py`](file:///d:/DOWNLOAD/RandomSongGuessingThing/backend/app.py): Bumped version to `v1.3.2`.
+## 3. Recent Modifications & Verified State (`v1.3.3`)
+- [`backend/app.py`](file:///d:/DOWNLOAD/RandomSongGuessingThing/backend/app.py): Bumped version to `v1.3.3`.
 - [`static/app.js`](file:///d:/DOWNLOAD/RandomSongGuessingThing/static/app.js):
-  - Added full-screen ambient reactive background system with smooth inertia/lerp tracking (`currentX`, `currentY`, `secondaryX`, `secondaryY`).
-  - Purged and blocked any standalone cursor dot elements (`#cursor-dot`, `.cursor-dot`, etc.).
-  - Continuously updates dynamic CSS variables (`--mouse-px-x`, `--mouse-px-y`, `--mouse-offset-x`, `--mouse-offset-y`, `--mouse-wave-x`, `--mouse-wave-y`).
-  - Synthesizes dynamic spotlight aura and orbiting ambient mesh with audio playback amplitude boosts.
+  - Completely removed moving/shifting background parallax and all green cursor glow spotlights/orbs.
+  - Implemented stationary background pattern grid with local mouse magnification: tiles within interaction radius smoothly expand in size centered at their fixed anchor points.
 - [`static/style.css`](file:///d:/DOWNLOAD/RandomSongGuessingThing/static/style.css):
-  - Upgraded body radial spotlight layers reacting directly to `--mouse-px-x` / `--mouse-px-y`.
-  - Added strict suppression rules for any cursor dot / custom dot overlay.
-  - Ensured floating Spotify logo pattern and traveling crowd wave shift with dynamic parallax depth.
+  - Removed all green radial gradients from `body` (`background-image: none`).
+  - Disabled legacy shifting overlays (`body::before`, `body::after` hidden) so the stationary magnifying canvas is the clean background layer.
 - [`static/index.html`](file:///d:/DOWNLOAD/RandomSongGuessingThing/static/index.html):
-  - Bumped asset query strings to `?v=1.3.2`.
+  - Bumped asset query strings to `?v=1.3.3`.
 
 ## 4. Immediate Next Steps
 - Full unified gameplay verified across both Local Desktop launcher and Cloud Vercel deployment.

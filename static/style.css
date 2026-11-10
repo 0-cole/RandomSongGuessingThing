@@ -88,10 +88,7 @@ html {
 body {
     position: relative;
     background-color: var(--bg-main);
-    background-image: 
-        radial-gradient(circle 650px at var(--mouse-px-x, 50%) var(--mouse-px-y, 50%), rgba(29, 185, 84, 0.12), transparent 75%),
-        radial-gradient(circle 950px at var(--mouse-px-x, 50%) var(--mouse-px-y, 50%), rgba(30, 215, 96, 0.05), transparent 85%);
-    background-attachment: fixed;
+    background-image: none;
     color: var(--color-text);
     font-family: var(--font-body);
     width: 100%;
@@ -117,6 +114,13 @@ body {
 
 html, body {
     cursor: auto !important;
+}
+
+/* Background canvas renders the interactive pattern with local mouse magnification; hide legacy CSS overlays */
+body::before,
+body::after {
+    display: none !important;
+    content: none !important;
 }
 
 /* Background floating Spotify logo & bubble pattern moving down and to the right */
