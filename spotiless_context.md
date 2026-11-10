@@ -1,40 +1,46 @@
 # Spotiless Context Summary (`spotiless_context.md`)
 
 ## 1. Executive Summary & High-Level Objective
-- **Project**: Spotiless (Songless — Spotify Edition), a local web-based Spotify song-guessing game (`http://127.0.0.1:4321`) launched in an isolated app window via `launcher.py`.
-- **Current Version**: `v1.2.0`
-- **Core Capabilities**:
-  - **Centered Symmetrical Layout**: Full viewport centering (`body { width: 100%; display: flex; flex-direction: column; align-items: center; }` and `.app-layout { margin: 0 auto; width: 100%; max-width: 690px; }`), with a 3-column grid navbar (`1fr auto 1fr`) keeping the title and all elements mathematically centered.
-  - **Light & Dark Mode**: Seamless toggle button (`#btn-theme-toggle`) in the top navbar with instant inline local storage initialization, CSS theme variables, adaptive cards, waveform, and buttons.
-  - **Playlist & Combined Playlists Game Counter**: Real-time game progression tracking showing current song index, total songs in pool, percentage completion, and session win record across single playlists, multi-selected combined playlists, and difficulty modes.
-  - **100% Native Spotify Audio & Catalogue (Zero iTunes)**: Uses Spotify's native Librespot protocol over TCP port 4070 (`ap-gae2.spotify.com:4070`) + AES-128-CTR decryption from Spotify's official audio CDNs (`audio-fa.scdn.co`, `audio-cf.spotifycdn.com`) trimmed to exact `OggS` page boundaries.
-  - **FortiGuard / School Wi-Fi Resilience**: Because port 4070 uses raw Shannon stream cipher TCP (no TLS SNI) and audio/images come from `scdn.co` / `spotifycdn.com`, playlist fetching (`hm://playlist/v2/playlist/{id}`), track metadata (`hm://metadata/4/track/{hex_id}`), and encrypted audio streaming work even when `*.spotify.com` HTTPS is blocked by FortiGuard.
-  - **Credential Integration**: Automatically imports the user's reusable Librespot playback grant (`playback.rocks.spotifast.Spotifast`) and Web API grant from Windows Credential Manager into `session_cache.json`, and supports 1-click browser OAuth PKCE on `http://127.0.0.1:8989/login`.
+- **Project**: Spotiless (Songless — Spotify Edition), an endless music guessing game inspired by *Songless* (Lessgames) with microsecond-accurate snippet intervals (0.1s → 0.25s → 0.5s → 1.0s → 2.0s → 5.0s).
+- **Current Version**: `v1.2.2`
+- **Official Branding**: **Spotiless** (standardized without hyphens).
+- **Dual Architecture**:
+  1. **Desktop Native Mode (`launcher.py` / `127.0.0.1:4321`)**: 100% Native Spotify Shannon cipher streaming over TCP port 4070 (`ap-gae2.spotify.com:4070`) using cached Librespot playback tokens and personal Spotify user libraries.
+  2. **Cloud Standalone Mode (`vercel.json` / `spotiless.vercel.app`)**: 100% decoupled client-side web mode. Users can play independently on mobile or desktop without a local Python daemon or sharing personal Spotify accounts. Audio snippets stream via public Apple/iTunes preview CDNs decoded with sample accuracy by the Web Audio API.
 
 ## 2. Critical Architecture & Invariants
-- **No iTunes Fallback**: Audio resolution in `backend/audio_resolver.py` and `backend/spotify_manager.py` must strictly use Spotify's native Librespot stream (`get_track_audio_bytes`) and local `.ogg` cache (`audio_cache/`).
-- **Librespot Core Patches (`_apply_librespot_patches` in `backend/spotify_manager.py`)**:
-  - `Session.ConnectionHolder.read` must loop until all `length` bytes are read from the TCP socket so multi-MTU packets never desynchronize the Shannon stream cipher.
-  - `ApResolver.request` falls back to `ap-gae2.spotify.com:4070` when `apresolve.spotify.com` HTTPS is intercepted.
-  - `DealerClient.connect` is non-fatal when `login5.spotify.com` HTTPS is blocked.
-- **Strict Playlist Pool Isolation & Multi-Playlist Combination**: Selecting one or multiple playlists (`playlist_ids`) loads and deduplicates only tracks belonging to the chosen playlist(s) (`fetch_playlist_tracks`), filtering out delisted/unplayable 0-duration tracks.
+- **Multi-User Privacy Isolation**: In cloud mode, no user touches another player's Spotify account. All streaks, win rates, theme preferences, and OAuth tokens are stored strictly inside the player's private browser `localStorage`.
+- **20-Point Legal Protection Checklist (In Compliance with App Store / Fair Use Guidelines)**:
+  - 100% Client-Side Privacy Policy & zero-server-tracking architecture.
+  - Non-commercial Fair Use disclaimer for educational/trivia commentary.
+  - Zero Cookie Policy & Zero Tracking SDKs (no Meta Pixel or Google Analytics).
+  - No Hidden Fees, Free Forever disclaimer (no refunds applicable).
+  - COPPA Notice: Does not knowingly collect data from children under 13.
+  - Right to Erasure / GDPR Compliance: One-click "Delete All Local Data & Reset App" button (`#btn-wipe-data`).
+  - High-contrast accessible UI across Light and Dark themes.
+  - Keyboard navigation (Spacebar plays snippet, Enter submits guess / advances round, Esc closes modals).
+- **Mobile Responsive Layout**: Responsive `@media (max-width: 600px)` query adapting to iPhone/Android screen dimensions with compact 2-row navbar, 54px play button, 38px guess rows, and iOS safe-area insets.
 
-## 3. Recent Modifications & Verified State (`v1.2.0`)
-- [`backend/app.py`](file:///c:/Users/cdbla/Documents/GitHub/Spotiless/backend/app.py):
-  - Bumped version to `v1.2.0` to trigger automatic live reload in active client sessions.
-- [`static/index.html`](file:///c:/Users/cdbla/Documents/GitHub/Spotiless/static/index.html):
-  - Added flash-free `<script>` in `<head>` and `<body>` checking `localStorage.getItem("spotiless_theme")`.
-  - Added `#btn-theme-toggle` in the top navbar containing animated SVG sun and moon icons.
-  - Replaced isolated corner disclaimer with `.page-footnote` centered beneath the dock inside `.app-layout`.
-  - Bumped stylesheet and script assets to `v=1.2.0`.
-- [`static/style.css`](file:///c:/Users/cdbla/Documents/GitHub/Spotiless/static/style.css):
-  - Added responsive centering architecture on `html`, `body` (`flex-direction: column; align-items: center`), and `.app-layout` (`margin: 0 auto; max-width: 690px`).
-  - Added 3-column grid navbar (`grid-template-columns: 1fr auto 1fr`) ensuring `SPOTI-LESS` logo is always placed at the 50% midpoint.
-  - Implemented complete `body.light-theme` palette variables and component overrides (clean card surfaces, high-contrast readable typography, subtle borders, adapted play controls, and toasts).
-  - Replaced hardcoded `rgba(255, 255, 255, ...)` with CSS custom properties (`--modal-backdrop`, `--visualizer-bg`, `--border-color`, `--bg-tile`).
-- [`static/app.js`](file:///c:/Users/cdbla/Documents/GitHub/Spotiless/static/app.js):
-  - Added `initTheme()`, `applyTheme()`, and `toggleTheme()` functions with persistent state in `localStorage` under `spotiless_theme`.
-  - Attached event listener to `#btn-theme-toggle`.
+## 3. Recent Modifications & Verified State (`v1.2.2`)
+- [`backend/app.py`](file:///d:/DOWNLOAD/RandomSongGuessingThing/backend/app.py):
+  - Bumped version to `v1.2.2`.
+- [`vercel.json`](file:///d:/DOWNLOAD/RandomSongGuessingThing/vercel.json):
+  - Configured static output directory (`"outputDirectory": "static"`) and SPA rewrite rules for seamless deployment on Vercel.
+- [`static/cloud_tracks.json`](file:///d:/DOWNLOAD/RandomSongGuessingThing/static/cloud_tracks.json):
+  - Curated catalogue of top hits across genres for instant, zero-login standalone cloud gameplay.
+- [`static/audio_player.js`](file:///d:/DOWNLOAD/RandomSongGuessingThing/static/audio_player.js):
+  - Enhanced `MicroAudioEngine.loadTrack` to support public Apple/iTunes audio fallback when running decoupled from the desktop Librespot daemon.
+- [`static/app.js`](file:///d:/DOWNLOAD/RandomSongGuessingThing/static/app.js):
+  - Integrated `CloudGameManager` for automatic client-side gameplay when `/api/status` is not reached.
+  - Wired up Privacy & Terms modal (`#btn-open-privacy`) and data deletion wipe (`#btn-wipe-data`).
+- [`static/index.html`](file:///d:/DOWNLOAD/RandomSongGuessingThing/static/index.html):
+  - Added Privacy, Terms, Cookie, Fee, COPPA, and Data Erasure modal (`#modal-privacy`).
+  - Added centered footer footnote with legal link.
+  - Bumped stylesheet and script asset query strings to `?v=1.2.2`.
+- [`static/style.css`](file:///d:/DOWNLOAD/RandomSongGuessingThing/static/style.css):
+  - Added styles for `.page-footnote`, `.footer-legal-link`, `.modal-wide`, `.modal-body-scroll`, `.legal-section`, and `.btn-danger`.
+  - Added complete mobile responsive rules.
 
-## 4. Immediate Next Steps
-- Ready for full centered gameplay in both Dark and Light modes across all playlists and window dimensions.
+## 4. Next Deployment Steps
+- Push changes to GitHub repository (`origin main`).
+- Deploy on Vercel via GitHub import (select `static` or standard preset).

@@ -87,7 +87,207 @@ document.addEventListener("DOMContentLoaded", () => {
     let searchTimeout = null;
     let focusedItemIndex = -1;
     let authPollingInterval = null;
-    let shareTextCache = "";
+        let shareTextCache = "";
+    let isCloudMode = false;
+
+    // ----------------- Cloud Standalone Mode Engine -----------------
+    const CloudGameManager = {
+        tracks: [],
+        currentIndex: 0,
+        stages: [0.1, 0.25, 0.5, 1.0, 2.0, 5.0],
+        attemptIndex: 0,
+        guesses: [],
+        isWon: false,
+        isOver: false,
+        stats: {
+            played: 0,
+            won: 0,
+            current_streak: 0,
+            best_streak: 0,
+            distribution: { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0, "6": 0 }
+        },
+
+        init: async function() {
+            try {
+                const res = await fetch("cloud_tracks.json");
+                if (res.ok) {
+                    this.tracks = await res.json();
+                }
+            } catch (e) {
+                console.warn("Failed to load cloud_tracks.json:", e);
+            }
+
+            try {
+                const savedStats = localStorage.getItem("spotiless_cloud_stats");
+                if (savedStats) this.stats = JSON.parse(savedStats);
+            } catch (e) {}
+
+            try {
+                const savedIdx = localStorage.getItem("spotiless_cloud_index");
+                if (savedIdx !== null) this.currentIndex = parseInt(savedIdx, 10) || 0;
+            } catch (e) {}
+
+            this.resetRound();
+        },
+
+        saveStats: function() {
+            try {
+                localStorage.setItem("spotiless_cloud_stats", JSON.stringify(this.stats));
+                localStorage.setItem("spotiless_cloud_index", String(this.currentIndex));
+            } catch (e) {}
+        },
+
+        resetRound: function() {
+            this.attemptIndex = 0;
+            this.guesses = [];
+            this.isWon = false;
+            this.isOver = false;
+        },
+
+        getCurrentTrack: function() {
+            if (!this.tracks.length) return null;
+            return this.tracks[this.currentIndex % this.tracks.length];
+        },
+
+        getState: function() {
+            const track = this.getCurrentTrack();
+            const total = this.tracks.length || 1;
+            const songIdx = (this.currentIndex % total) + 1;
+            const unlockedSec = this.stages[Math.min(this.attemptIndex, this.stages.length - 1)];
+
+            const state = {
+                active: true,
+                round_id: track ? track.id : "cloud_demo",
+                attempt: this.attemptIndex + 1,
+                max_attempts: this.stages.length,
+                unlocked_seconds: unlockedSec,
+                all_stages: this.stages,
+                guesses: this.guesses,
+                is_won: this.isWon,
+                is_over: this.isOver,
+                pool_name: "🔥 Spotiless Top Hits (Cloud)",
+                total_songs: total,
+                song_index: songIdx,
+                session_won: this.stats.won,
+                session_played: this.stats.played,
+                preview_query: track ? `${track.artist} ${track.name}` : ""
+            };
+
+            if (this.isOver && track) {
+                state.solution = track;
+                let emojiRow = "";
+                this.guesses.forEach(g => {
+                    emojiRow += g.correct ? "🟩" : g.skipped ? "⬛" : "🟥";
+                });
+                for (let i = this.guesses.length; i < this.stages.length; i++) {
+                    emojiRow += "⬜";
+                }
+                const scoreText = this.isWon ? `${this.attemptIndex + 1}/${this.stages.length}` : "X/6";
+                state.share_text = `Spotiless #${songIdx} ${scoreText}\n🔊 ${unlockedSec}s\n${emojiRow}\nhttps://github.com/0-cole/RandomSongGuessingThing`;
+            }
+
+            return state;
+        },
+
+        submitGuess: function(trackId, text) {
+            if (this.isOver) return this.getState();
+            const track = this.getCurrentTrack();
+            if (!track) return this.getState();
+
+            const normGuess = (text || "").toLowerCase().trim();
+            const normTitle = track.name.toLowerCase().trim();
+            const normArtist = track.artist.toLowerCase().trim();
+
+            let isMatch = false;
+            if (trackId && trackId === track.id) {
+                isMatch = true;
+            } else if (normGuess) {
+                if (normGuess.includes(normTitle) || normTitle.includes(normGuess)) {
+                    isMatch = true;
+                }
+            }
+
+            this.guesses.push({
+                attempt: this.attemptIndex + 1,
+                unlocked_seconds: this.stages[this.attemptIndex],
+                correct: isMatch,
+                skipped: false,
+                track_name: isMatch ? track.name : text,
+                artist: isMatch ? track.artist : ""
+            });
+
+            if (isMatch) {
+                this.isWon = true;
+                this.isOver = true;
+                this.stats.played++;
+                this.stats.won++;
+                this.stats.current_streak++;
+                if (this.stats.current_streak > this.stats.best_streak) {
+                    this.stats.best_streak = this.stats.current_streak;
+                }
+                const stageKey = String(this.attemptIndex + 1);
+                this.stats.distribution[stageKey] = (this.stats.distribution[stageKey] || 0) + 1;
+                this.saveStats();
+            } else {
+                this.attemptIndex++;
+                if (this.attemptIndex >= this.stages.length) {
+                    this.isOver = true;
+                    this.stats.played++;
+                    this.stats.current_streak = 0;
+                    this.saveStats();
+                }
+            }
+
+            return this.getState();
+        },
+
+        skip: function() {
+            if (this.isOver) return this.getState();
+            this.guesses.push({
+                attempt: this.attemptIndex + 1,
+                unlocked_seconds: this.stages[this.attemptIndex],
+                correct: false,
+                skipped: true,
+                track_name: "Skipped",
+                artist: ""
+            });
+
+            this.attemptIndex++;
+            if (this.attemptIndex >= this.stages.length) {
+                this.isOver = true;
+                this.stats.played++;
+                this.stats.current_streak = 0;
+                this.saveStats();
+            }
+
+            return this.getState();
+        },
+
+        giveUp: function() {
+            if (this.isOver) return this.getState();
+            this.isOver = true;
+            this.stats.played++;
+            this.stats.current_streak = 0;
+            this.saveStats();
+            return this.getState();
+        },
+
+        nextRound: function() {
+            this.currentIndex++;
+            this.resetRound();
+            this.saveStats();
+            return this.getState();
+        },
+
+        search: function(query) {
+            const q = query.toLowerCase().trim();
+            if (!q) return [];
+            return this.tracks.filter(t => 
+                t.name.toLowerCase().includes(q) || 
+                t.artist.toLowerCase().includes(q)
+            ).slice(0, 8);
+        }
+    };
 
     // ----------------- Audio & Visualizer Setup -----------------
     audio.onPlayStart = (duration) => {
@@ -169,13 +369,35 @@ document.addEventListener("DOMContentLoaded", () => {
 
     async function init() {
         initTheme();
-        await refreshStatus();
-        await loadGameState();
+        try {
+            const testRes = await fetch("/api/status");
+            if (!testRes.ok) throw new Error("No backend");
+            await refreshStatus();
+            await loadGameState();
+            setInterval(refreshStatus, 3000);
+        } catch (err) {
+            console.log("Starting Spotiless in Cloud Standalone Mode ☁️");
+            isCloudMode = true;
+            await CloudGameManager.init();
+            refreshStatus();
+            loadGameState();
+        }
         setupEventListeners();
-        setInterval(refreshStatus, 3000);
     }
 
     async function refreshStatus() {
+        if (isCloudMode) {
+            authStatusDot.className = "dot-connected";
+            authUsernameLabel.textContent = "Cloud Mode";
+            streakCounter.textContent = CloudGameManager.stats.current_streak || 0;
+            activePoolLabel.textContent = "🔥 Spotiless Hits";
+            if (navCounterPill) {
+                const total = CloudGameManager.tracks.length || 1;
+                const idx = (CloudGameManager.currentIndex % total) + 1;
+                navCounterPill.textContent = `${idx}/${total}`;
+            }
+            return;
+        }
         try {
             const res = await fetch("/api/status");
             const data = await res.json();
@@ -219,6 +441,10 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     async function loadGameState() {
+        if (isCloudMode) {
+            applyGameState(CloudGameManager.getState());
+            return;
+        }
         showSpinner(true);
         try {
             const res = await fetch("/api/game/state");
@@ -237,7 +463,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
         // Preload audio into memory buffer
         showSpinner(true);
-        audio.loadTrack(state.round_id).then((ok) => {
+        const audioFallback = state.solution ? `${state.solution.artist} ${state.solution.name}` : (state.preview_query || "");
+        audio.loadTrack(state.round_id, audioFallback).then((ok) => {
             showSpinner(false);
             if (!ok) { startNextRound(); }
         });
@@ -370,6 +597,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
         audio.stop();
 
+        if (isCloudMode) {
+            const newState = CloudGameManager.submitGuess(guessId, guessText);
+            applyGameState(newState);
+            refreshStatus();
+            return;
+        }
+
         try {
             const res = await fetch("/api/game/guess", {
                 method: "POST",
@@ -386,6 +620,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
     async function skipCurrentAttempt() {
         audio.stop();
+        if (isCloudMode) {
+            const newState = CloudGameManager.skip();
+            applyGameState(newState);
+            return;
+        }
         try {
             const res = await fetch("/api/game/skip", { method: "POST" });
             const newState = await res.json();
@@ -397,6 +636,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
     async function giveUpRound() {
         audio.stop();
+        if (isCloudMode) {
+            const newState = CloudGameManager.giveUp();
+            applyGameState(newState);
+            refreshStatus();
+            return;
+        }
         try {
             const res = await fetch("/api/game/give_up", { method: "POST" });
             const newState = await res.json();
@@ -410,6 +655,13 @@ document.addEventListener("DOMContentLoaded", () => {
     async function startNextRound() {
         closeModals();
         audio.stop();
+        if (isCloudMode) {
+            const newState = CloudGameManager.nextRound();
+            applyGameState(newState);
+            inputGuess.value = "";
+            inputGuess.focus();
+            return;
+        }
         showSpinner(true);
         try {
             const res = await fetch("/api/game/new_round", { method: "POST" });
@@ -439,6 +691,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
         clearTimeout(searchTimeout);
         searchTimeout = setTimeout(async () => {
+            if (isCloudMode) {
+                renderAutocompleteResults(CloudGameManager.search(val));
+                return;
+            }
             try {
                 const res = await fetch(`/api/game/search?q=${encodeURIComponent(val)}`);
                 const data = await res.json();
@@ -959,6 +1215,16 @@ document.addEventListener("DOMContentLoaded", () => {
     // ----------------- Stats Modal -----------------
     async function openStatsModal() {
         modalStats.classList.remove("hidden");
+        if (isCloudMode) {
+            const stats = CloudGameManager.stats;
+            document.getElementById("stat-played").textContent = stats.played || 0;
+            const winRate = stats.played ? Math.round((stats.won / stats.played) * 100) : 0;
+            document.getElementById("stat-winrate").textContent = `${winRate}%`;
+            document.getElementById("stat-streak").textContent = stats.current_streak || 0;
+            document.getElementById("stat-best-streak").textContent = stats.best_streak || 0;
+            renderStatsChart(stats.distribution || {});
+            return;
+        }
         try {
             const res = await fetch("/api/status");
             const data = await res.json();
@@ -1052,6 +1318,26 @@ document.addEventListener("DOMContentLoaded", () => {
         document.getElementById("btn-open-stats").addEventListener("click", openStatsModal);
         document.getElementById("btn-open-auth").addEventListener("click", openAuthModal);
         if (btnThemeToggle) btnThemeToggle.addEventListener("click", toggleTheme);
+
+        // Privacy & Data Deletion
+        const btnOpenPrivacy = document.getElementById("btn-open-privacy");
+        const modalPrivacy = document.getElementById("modal-privacy");
+        if (btnOpenPrivacy && modalPrivacy) {
+            btnOpenPrivacy.addEventListener("click", () => {
+                modalPrivacy.classList.remove("hidden");
+            });
+        }
+
+        const btnWipeData = document.getElementById("btn-wipe-data");
+        if (btnWipeData) {
+            btnWipeData.addEventListener("click", () => {
+                if (confirm("Are you sure you want to permanently delete all local game data, streaks, and preferences from this device?")) {
+                    localStorage.clear();
+                    sessionStorage.clear();
+                    window.location.reload();
+                }
+            });
+        }
 
         // Keyboard Shortcuts
         window.addEventListener("keydown", (e) => {

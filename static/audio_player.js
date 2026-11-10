@@ -33,7 +33,7 @@ class MicroAudioEngine {
         }
     }
 
-    async loadTrack(trackId) {
+    async loadTrack(trackId, fallbackQuery = "") {
         this.initContext();
         if (this.currentTrackId === trackId && this.audioBuffer) {
             return true; // Already loaded
@@ -44,13 +44,52 @@ class MicroAudioEngine {
         this.audioBuffer = null;
         this.startOffset = 0;
 
+        let arrayBuffer = null;
+
+        // 1. Try local server endpoint if on localhost / local desktop launcher
         try {
             const res = await fetch(`/api/audio/${encodeURIComponent(trackId)}`);
-            if (!res.ok) {
-                console.error("Failed to fetch audio stream:", res.status);
-                return false;
+            if (res.ok) {
+                arrayBuffer = await res.arrayBuffer();
             }
-            const arrayBuffer = await res.arrayBuffer();
+        } catch (e) {
+            // Local backend not reachable (e.g. cloud / Vercel deployment)
+        }
+
+        // 2. Cloud Standalone Fallback: Fetch preview stream via public Apple/iTunes CDN
+        if (!arrayBuffer && fallbackQuery) {
+            try {
+                let previewUrl = null;
+                if (fallbackQuery.startsWith("http://") || fallbackQuery.startsWith("https://")) {
+                    previewUrl = fallbackQuery;
+                } else {
+                    const searchUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(fallbackQuery)}&entity=song&limit=1`;
+                    const sRes = await fetch(searchUrl);
+                    if (sRes.ok) {
+                        const sData = await sRes.json();
+                        if (sData.results && sData.results.length > 0) {
+                            previewUrl = sData.results[0].previewUrl;
+                        }
+                    }
+                }
+
+                if (previewUrl) {
+                    const audioRes = await fetch(previewUrl);
+                    if (audioRes.ok) {
+                        arrayBuffer = await audioRes.arrayBuffer();
+                    }
+                }
+            } catch (err) {
+                console.warn("Cloud fallback audio resolution error:", err);
+            }
+        }
+
+        if (!arrayBuffer) {
+            console.error("Could not obtain audio for track:", trackId);
+            return false;
+        }
+
+        try {
             this.audioBuffer = await this.ctx.decodeAudioData(arrayBuffer);
             const detectedOffset = this.detectAudioStartOffset(this.audioBuffer);
             if (detectedOffset === null) {
