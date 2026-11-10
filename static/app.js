@@ -353,6 +353,200 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     drawVisualizer();
 
+    // ----------------- Interactive Mouse Background System -----------------
+    // Replaces any standalone "green dot" cursor follower with true ambient background reactivity
+    function initMouseBackgroundReactivity() {
+        // 1. Purge any existing green dot or custom cursor follower elements from DOM
+        const purgeStaleDots = () => {
+            const staleSelectors = [
+                "#cursor-dot", ".cursor-dot",
+                "#mouse-dot", ".mouse-dot",
+                "#cursor-follower", ".cursor-follower",
+                "#custom-cursor", ".custom-cursor",
+                "#cursor-glow", ".cursor-glow",
+                ".cursor-trail", ".mouse-circle"
+            ];
+            document.querySelectorAll(staleSelectors.join(",")).forEach(el => el.remove());
+            if (document.body) document.body.style.cursor = "auto";
+            if (document.documentElement) document.documentElement.style.cursor = "auto";
+        };
+        purgeStaleDots();
+        // Guard against any late-injected cursor dots
+        const observer = new MutationObserver(() => purgeStaleDots());
+        observer.observe(document.body || document.documentElement, { childList: true, subtree: true });
+
+        // 2. Create or bind full-screen ambient reactive background canvas
+        let bgCanvas = document.getElementById("interactive-bg-canvas");
+        if (!bgCanvas) {
+            bgCanvas = document.createElement("canvas");
+            bgCanvas.id = "interactive-bg-canvas";
+            bgCanvas.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100vw;
+                height: 100vh;
+                pointer-events: none;
+                z-index: 0;
+                overflow: hidden;
+                transition: opacity 0.5s ease;
+            `;
+            const mainContainer = document.querySelector(".app-container") || document.body;
+            document.body.insertBefore(bgCanvas, document.body.firstChild);
+        }
+
+        const bgCtx = bgCanvas.getContext("2d");
+        let width = (bgCanvas.width = window.innerWidth);
+        let height = (bgCanvas.height = window.innerHeight);
+
+        const onResize = () => {
+            width = bgCanvas.width = window.innerWidth;
+            height = bgCanvas.height = window.innerHeight;
+        };
+        window.addEventListener("resize", onResize, { passive: true });
+
+        // Mouse physics & smooth spring/lerp state
+        let targetX = width / 2;
+        let targetY = height / 2;
+        let currentX = width / 2;
+        let currentY = height / 2;
+        let secondaryX = width / 2;
+        let secondaryY = height / 2;
+        let mouseSpeed = 0;
+        let lastMoveTime = Date.now();
+        let isMouseActive = false;
+
+        window.addEventListener("mousemove", (e) => {
+            const dx = e.clientX - targetX;
+            const dy = e.clientY - targetY;
+            mouseSpeed = Math.min(Math.sqrt(dx * dx + dy * dy), 60);
+            targetX = e.clientX;
+            targetY = e.clientY;
+            lastMoveTime = Date.now();
+            isMouseActive = true;
+        }, { passive: true });
+
+        // Touch support for mobile devices
+        window.addEventListener("touchmove", (e) => {
+            if (e.touches && e.touches[0]) {
+                targetX = e.touches[0].clientX;
+                targetY = e.touches[0].clientY;
+                isMouseActive = true;
+                lastMoveTime = Date.now();
+            }
+        }, { passive: true });
+
+        // Ambient orbs configuration
+        const orbs = [
+            { xPct: 0.25, yPct: 0.35, baseR: 320, colorDark: "rgba(29, 185, 84, 0.14)", colorLight: "rgba(29, 185, 84, 0.08)", speed: 0.0008, phase: 0 },
+            { xPct: 0.75, yPct: 0.65, baseR: 380, colorDark: "rgba(16, 120, 60, 0.10)", colorLight: "rgba(16, 120, 60, 0.05)", speed: 0.0011, phase: Math.PI },
+            { xPct: 0.50, yPct: 0.85, baseR: 280, colorDark: "rgba(30, 215, 96, 0.08)", colorLight: "rgba(30, 215, 96, 0.04)", speed: 0.0014, phase: Math.PI / 2 }
+        ];
+
+        let animFrameId = null;
+        function renderBackground(time) {
+            animFrameId = requestAnimationFrame(renderBackground);
+
+            // Smooth lerp tracking (fluid inertia)
+            currentX += (targetX - currentX) * 0.07;
+            currentY += (targetY - currentY) * 0.07;
+            secondaryX += (targetX - secondaryX) * 0.035;
+            secondaryY += (targetY - secondaryY) * 0.035;
+
+            // Decay speed
+            mouseSpeed *= 0.94;
+
+            // Update CSS variables smoothly for CSS background patterns and radial gradients
+            const normX = (currentX / width) - 0.5;
+            const normY = (currentY / height) - 0.5;
+            const root = document.documentElement;
+            root.style.setProperty("--mouse-px-x", `${currentX.toFixed(1)}px`);
+            root.style.setProperty("--mouse-px-y", `${currentY.toFixed(1)}px`);
+            root.style.setProperty("--mouse-x", `${currentX.toFixed(1)}px`);
+            root.style.setProperty("--mouse-y", `${currentY.toFixed(1)}px`);
+            root.style.setProperty("--mouse-pct-x", `${((currentX / width) * 100).toFixed(2)}%`);
+            root.style.setProperty("--mouse-pct-y", `${((currentY / height) * 100).toFixed(2)}%`);
+            root.style.setProperty("--mouse-offset-x", `${(normX * 32).toFixed(2)}px`);
+            root.style.setProperty("--mouse-offset-y", `${(normY * 32).toFixed(2)}px`);
+            root.style.setProperty("--mouse-wave-x", `${(normX * -48).toFixed(2)}px`);
+            root.style.setProperty("--mouse-wave-y", `${(normY * -48).toFixed(2)}px`);
+
+            bgCtx.clearRect(0, 0, width, height);
+
+            const isDark = !document.body.classList.contains("light-theme");
+            const audioBoost = (audio && audio.isPlaying) ? 1.25 : 1.0;
+
+            // 1. Draw drifting ambient background orbs that gently gravitate towards/away from mouse
+            for (let i = 0; i < orbs.length; i++) {
+                const orb = orbs[i];
+                const t = time * orb.speed + orb.phase;
+                const naturalX = width * orb.xPct + Math.sin(t) * 80;
+                const naturalY = height * orb.yPct + Math.cos(t * 0.8) * 60;
+
+                // Subtle parallax push from mouse
+                const parallaxOffsetX = (currentX - width / 2) * (0.04 * (i + 1));
+                const parallaxOffsetY = (currentY - height / 2) * (0.04 * (i + 1));
+                const orbX = naturalX + parallaxOffsetX;
+                const orbY = naturalY + parallaxOffsetY;
+                const orbR = orb.baseR * audioBoost;
+
+                const orbGrad = bgCtx.createRadialGradient(orbX, orbY, 0, orbX, orbY, orbR);
+                const col = isDark ? orb.colorDark : orb.colorLight;
+                orbGrad.addColorStop(0, col);
+                orbGrad.addColorStop(0.6, col.replace(/[\d\.]+\)$/, "0.03)"));
+                orbGrad.addColorStop(1, "rgba(0, 0, 0, 0)");
+
+                bgCtx.fillStyle = orbGrad;
+                bgCtx.beginPath();
+                bgCtx.arc(orbX, orbY, orbR, 0, Math.PI * 2);
+                bgCtx.fill();
+            }
+
+            // 2. Primary interactive cursor spotlight directly illuminating the background
+            const dynamicRadius = (350 + mouseSpeed * 3) * audioBoost;
+            const primaryGlow = bgCtx.createRadialGradient(currentX, currentY, 0, currentX, currentY, dynamicRadius);
+            if (isDark) {
+                primaryGlow.addColorStop(0, "rgba(29, 185, 84, 0.22)");
+                primaryGlow.addColorStop(0.35, "rgba(29, 185, 84, 0.10)");
+                primaryGlow.addColorStop(0.7, "rgba(20, 100, 50, 0.03)");
+                primaryGlow.addColorStop(1, "rgba(0, 0, 0, 0)");
+            } else {
+                primaryGlow.addColorStop(0, "rgba(29, 185, 84, 0.14)");
+                primaryGlow.addColorStop(0.4, "rgba(29, 185, 84, 0.06)");
+                primaryGlow.addColorStop(0.75, "rgba(29, 185, 84, 0.02)");
+                primaryGlow.addColorStop(1, "rgba(255, 255, 255, 0)");
+            }
+
+            bgCtx.fillStyle = primaryGlow;
+            bgCtx.beginPath();
+            bgCtx.arc(currentX, currentY, dynamicRadius, 0, Math.PI * 2);
+            bgCtx.fill();
+
+            // 3. Secondary soft trailing aura with deeper emerald tone
+            const trailRadius = 500 * audioBoost;
+            const trailGlow = bgCtx.createRadialGradient(secondaryX, secondaryY, 0, secondaryX, secondaryY, trailRadius);
+            if (isDark) {
+                trailGlow.addColorStop(0, "rgba(30, 215, 96, 0.08)");
+                trailGlow.addColorStop(0.5, "rgba(18, 120, 55, 0.02)");
+                trailGlow.addColorStop(1, "rgba(0, 0, 0, 0)");
+            } else {
+                trailGlow.addColorStop(0, "rgba(30, 215, 96, 0.05)");
+                trailGlow.addColorStop(0.5, "rgba(18, 120, 55, 0.015)");
+                trailGlow.addColorStop(1, "rgba(255, 255, 255, 0)");
+            }
+
+            bgCtx.fillStyle = trailGlow;
+            bgCtx.beginPath();
+            bgCtx.arc(secondaryX, secondaryY, trailRadius, 0, Math.PI * 2);
+            bgCtx.fill();
+        }
+
+        renderBackground(0);
+    }
+
+    // Initialize interactive mouse background reactivity immediately
+    initMouseBackgroundReactivity();
+
     // ----------------- Initialization -----------------
     // ----------------- Theme Management -----------------
     function initTheme() {

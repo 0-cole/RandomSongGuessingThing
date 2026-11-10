@@ -18,19 +18,21 @@
 
 ## 1. Executive Summary & High-Level Objective
 - **Project**: Spotiless (Songless — Spotify Edition), an endless music guessing game inspired by *Songless* (Lessgames) with microsecond-accurate snippet intervals (0.1s → 0.25s → 0.5s → 1.0s → 2.0s → 5.0s).
-- **Current Version**: `v1.3.1` (Unified GitHub Cloud & Local Native Release)
+- **Current Version**: `v1.3.2` (Unified GitHub Cloud & Local Native Release)
 - **Official Branding**: **Spoti-Less** in-app / **Spotiless** for domain and repository links.
 - **Dual Architecture**:
   1. **Desktop Native Mode (`launcher.py` / `127.0.0.1:4321`)**: 100% Native Spotify Shannon cipher streaming over TCP port 4070 (`ap-gae2.spotify.com:4070`) using cached Librespot playback tokens and personal Spotify user libraries. Works even through school firewalls and FortiGuard blocks.
   2. **Cloud Standalone Mode (`vercel.json` / `spotiless.vercel.app`)**: 100% decoupled client-side web mode. Users can play independently on mobile or desktop without a local Python daemon. Audio snippets stream via public Apple/iTunes preview CDNs decoded with sample accuracy by the Web Audio API.
 
 ## 2. Critical Architecture & Invariants
+- **Mandatory GitHub Push Invariant**: Always push commits to GitHub remote immediately upon task completion. Client auto-updaters, deployments (Vercel), and GitHub repo state must always stay synced after every verified feature, fix, or version bump.
 - **Centered Symmetrical Layout & Mobile Responsiveness**:
   - Full viewport centering (`body { width: 100%; display: flex; flex-direction: column; align-items: center; }` and `.app-layout { margin: 0 auto; width: 100%; max-width: 690px; }`).
   - Clean 3-column grid navbar (`1fr auto 1fr`) on desktop; responsive 2-row layout with compact touch-friendly dock and bottom-sheet modals on mobile screens (`@media (max-width: 600px)`).
 - **Floating Animated Spotify Logo Pattern & Mouse Spotlight**:
   - Dual-layer continuous floating Spotify logo pattern (`body::before` floating pattern and `body::after` traveling crowd wave) animated down and to the right.
-  - Interactive mouse parallax tracking and radial spotlight effect (`initMouseReactivity()` in `static/app.js` runs immediately on `DOMContentLoaded` and tracks `pointermove` + `mousemove`).
+  - Interactive mouse parallax tracking and radial spotlight effect (`initMouseBackgroundReactivity()` in `static/app.js` runs immediately on `DOMContentLoaded` and tracks `mousemove` + `touchmove`).
+  - Dynamic full-screen canvas behind UI with smooth lerped ambient aura, orbiting mesh, and audio playback pulse boosts (zero green cursor dots).
 - **Precision Audio Engine & Highlight Snapping (`static/audio_player.js`)**:
   - Sample-accurate snippet cuts with 12ms hardware buffer lookahead (`startTime = now + 0.012`) and auto AudioContext un-suspension (`ensureContextRunning()`).
   - Intelligent chorus/hook detection (`detectAudioHighlightOffset`) with peak RMS analysis and 10ms micro-step onset snapping.
@@ -42,17 +44,19 @@
   - Ubiquitous Terms of Service & Privacy Policy modal (`#modal-privacy`) accessible via top navigation shield button (`#btn-nav-privacy`) and footer.
   - Data deletion copy preserved; wipe button earmarked for upcoming Settings menu.
 
-## 3. Recent Modifications & Verified State (`v1.3.1`)
-- **Version Bump & Asset Refresh**:
-  - Bumped `backend/app.py` to `__version__ = '1.3.1'`.
-  - Bumped asset query strings in `static/index.html` to `?v=1.3.1` for instant browser cache busting.
-- **Enhanced Mouse Reactivity**:
-  - `initMouseReactivity()` executes immediately on `DOMContentLoaded` before any network requests.
-  - Added `pointermove` + `mousemove` listeners with dual `:root` and `body` style injection.
-  - Parallax strength boosted to 24px–38px and radial spotlight boosted to 12% opacity with enlarged 80px overflow bounds.
-- **Remote Commits Preserved**:
-  - Incorporated `fix(auth)` breaking recursion loop in `checkAccountState`, sign-in mode handling, and close button fallbacks.
-  - Incorporated `refactor(legal)` clean disclosures and modal open polish.
+## 3. Recent Modifications & Verified State (`v1.3.2`)
+- [`backend/app.py`](file:///d:/DOWNLOAD/RandomSongGuessingThing/backend/app.py): Bumped version to `v1.3.2`.
+- [`static/app.js`](file:///d:/DOWNLOAD/RandomSongGuessingThing/static/app.js):
+  - Added full-screen ambient reactive background system with smooth inertia/lerp tracking (`currentX`, `currentY`, `secondaryX`, `secondaryY`).
+  - Purged and blocked any standalone cursor dot elements (`#cursor-dot`, `.cursor-dot`, etc.).
+  - Continuously updates dynamic CSS variables (`--mouse-px-x`, `--mouse-px-y`, `--mouse-offset-x`, `--mouse-offset-y`, `--mouse-wave-x`, `--mouse-wave-y`).
+  - Synthesizes dynamic spotlight aura and orbiting ambient mesh with audio playback amplitude boosts.
+- [`static/style.css`](file:///d:/DOWNLOAD/RandomSongGuessingThing/static/style.css):
+  - Upgraded body radial spotlight layers reacting directly to `--mouse-px-x` / `--mouse-px-y`.
+  - Added strict suppression rules for any cursor dot / custom dot overlay.
+  - Ensured floating Spotify logo pattern and traveling crowd wave shift with dynamic parallax depth.
+- [`static/index.html`](file:///d:/DOWNLOAD/RandomSongGuessingThing/static/index.html):
+  - Bumped asset query strings to `?v=1.3.2`.
 
 ## 4. Immediate Next Steps
 - Full unified gameplay verified across both Local Desktop launcher and Cloud Vercel deployment.

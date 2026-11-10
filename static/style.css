@@ -88,7 +88,10 @@ html {
 body {
     position: relative;
     background-color: var(--bg-main);
-    background-image: radial-gradient(circle 550px at var(--mouse-px-x, 50%) var(--mouse-px-y, 50%), rgba(29, 185, 84, 0.12), transparent 70%);
+    background-image: 
+        radial-gradient(circle 650px at var(--mouse-px-x, 50%) var(--mouse-px-y, 50%), rgba(29, 185, 84, 0.12), transparent 75%),
+        radial-gradient(circle 950px at var(--mouse-px-x, 50%) var(--mouse-px-y, 50%), rgba(30, 215, 96, 0.05), transparent 85%);
+    background-attachment: fixed;
     color: var(--color-text);
     font-family: var(--font-body);
     width: 100%;
@@ -102,6 +105,18 @@ body {
     overflow-x: hidden;
     user-select: none;
     transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+/* Ensure no intrusive cursor dots or standalone dot followers appear */
+#cursor-dot, .cursor-dot, #mouse-dot, .mouse-dot, #cursor-follower, .cursor-follower, #custom-cursor, .custom-cursor, .cursor-trail {
+    display: none !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+    visibility: hidden !important;
+}
+
+html, body {
+    cursor: auto !important;
 }
 
 /* Background floating Spotify logo & bubble pattern moving down and to the right */
