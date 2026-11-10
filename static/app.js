@@ -666,13 +666,14 @@ document.addEventListener("DOMContentLoaded", () => {
             if (data.connected) {
                 authStatusDot.className = "dot-connected";
                 authUsernameLabel.textContent = data.display_name || data.username || "Connected";
-                if (data.image) userAvatar.src = data.image;
-                userNameDisplay.textContent = data.display_name || data.username;
-                authConnectedView.classList.remove("hidden");
+                if (data.image && userAvatar) userAvatar.src = data.image;
+                if (userNameDisplay) userNameDisplay.textContent = data.display_name || data.username;
+                if (authConnectedView) authConnectedView.classList.remove("hidden");
+                const unconnected = document.getElementById("auth-unconnected-view");
+                if (unconnected) unconnected.classList.add("hidden");
             } else {
-                authStatusDot.className = "dot-disconnected";
-                authUsernameLabel.textContent = "Connect Spotify";
-                authConnectedView.classList.add("hidden");
+                // Not connected via backend Librespot session: sync with local account/cookie state
+                checkAccountState();
             }
 
             // Update stats & pool
@@ -1696,13 +1697,10 @@ document.addEventListener("DOMContentLoaded", () => {
         };
 
         const btnOpenPrivacy = document.getElementById("btn-open-privacy");
-        if (btnOpenPrivacy) btnOpenPrivacy.addEventListener("click", triggerPrivacy);
-
-        const btnDockPrivacy = document.getElementById("btn-dock-privacy");
-        if (btnDockPrivacy) btnDockPrivacy.addEventListener("click", triggerPrivacy);
+        if (btnOpenPrivacy) btnOpenPrivacy.addEventListener("click", (e) => triggerPrivacy(e));
 
         const btnNavPrivacy = document.getElementById("btn-nav-privacy");
-        if (btnNavPrivacy) btnNavPrivacy.addEventListener("click", triggerPrivacy);
+        if (btnNavPrivacy) btnNavPrivacy.addEventListener("click", (e) => triggerPrivacy(e));
 
         const btnWipeData = document.getElementById("btn-wipe-data");
         if (btnWipeData) {
@@ -1744,6 +1742,7 @@ document.addEventListener("DOMContentLoaded", () => {
             // Escape key closes modals / dropdown
             if (e.code === "Escape") {
                 closeModals();
+                if (window.closePrivacyModal) window.closePrivacyModal();
                 autocompleteList.classList.add("hidden");
             }
         });
