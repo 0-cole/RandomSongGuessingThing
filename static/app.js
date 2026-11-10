@@ -362,9 +362,159 @@ document.addEventListener("DOMContentLoaded", () => {
         } catch (e) {}
     }
 
+    function showLightModePaywallJoke() {
+        const existing = document.getElementById("lightmode-paywall-overlay");
+        if (existing) existing.remove();
+
+        const overlay = document.createElement("div");
+        overlay.id = "lightmode-paywall-overlay";
+        overlay.style.cssText = `
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.82);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 999999;
+            padding: 20px;
+            box-sizing: border-box;
+            transition: background 3s ease;
+        `;
+
+        const modalBox = document.createElement("div");
+        modalBox.id = "lightmode-paywall-box";
+        modalBox.style.cssText = `
+            background: linear-gradient(150deg, #1c1c1f, #28282e);
+            border: 2px solid #ffd700;
+            border-radius: 18px;
+            max-width: 400px;
+            width: 100%;
+            padding: 28px 24px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.85), 0 0 30px rgba(255, 215, 0, 0.25);
+            color: #ffffff;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            position: relative;
+            text-align: center;
+            box-sizing: border-box;
+            animation: paywallPop 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        `;
+
+        modalBox.innerHTML = `
+            <button id="paywall-btn-close" aria-label="Close" style="
+                position: absolute;
+                top: 14px;
+                right: 14px;
+                background: rgba(255,255,255,0.08);
+                border: 1px solid rgba(255,255,255,0.15);
+                color: #ddd;
+                font-size: 16px;
+                width: 32px;
+                height: 32px;
+                border-radius: 50%;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                line-height: 1;
+                transition: background 0.15s, transform 0.15s;
+            ">✕</button>
+            <div style="font-size: 44px; margin-bottom: 8px;">☀️🔒</div>
+            <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 2px; color: #ffd700; font-weight: 800; margin-bottom: 6px;">Spotiless Platinum VIP™</div>
+            <h2 style="margin: 0 0 8px 0; font-size: 22px; font-weight: 800; color: #ffffff;">Unlock Light Mode</h2>
+            <p style="margin: 0 0 16px 0; font-size: 13.5px; color: #a5a5ad; line-height: 1.45;">
+                Light mode requires ultra-luminescent photon servers and optical cornea certification.
+            </p>
+            <div style="background: rgba(255, 215, 0, 0.08); border: 1px dashed rgba(255, 215, 0, 0.45); border-radius: 12px; padding: 14px; margin-bottom: 20px;">
+                <div style="font-size: 28px; font-weight: 900; color: #ffd700; font-family: monospace;">$4.99 <span style="font-size: 13px; font-weight: normal; color: #bbb;">/ month</span></div>
+                <div style="font-size: 11.5px; color: #aaa; margin-top: 4px;">Includes 100% genuine flashbang simulation</div>
+            </div>
+            <button id="paywall-btn-pay" style="
+                width: 100%;
+                padding: 14px 20px;
+                border-radius: 30px;
+                background: linear-gradient(90deg, #ffd700, #ff9900);
+                border: none;
+                color: #121212;
+                font-weight: 800;
+                font-size: 15px;
+                letter-spacing: 0.5px;
+                cursor: pointer;
+                box-shadow: 0 6px 20px rgba(255, 170, 0, 0.4);
+                transition: transform 0.1s, filter 0.15s;
+            ">Tap to pay now</button>
+        `;
+
+        overlay.appendChild(modalBox);
+        document.body.appendChild(overlay);
+
+        let triggered = false;
+        function executePrank() {
+            if (triggered) return;
+            triggered = true;
+
+            // 1. Instantly switch to light mode the moment the text appears
+            applyTheme("light");
+
+            // 2. Clear modal content and display shitty Comic Sans text
+            overlay.innerHTML = "";
+            const jokeText = document.createElement("div");
+            jokeText.textContent = "just kidding lmao";
+            jokeText.style.cssText = `
+                font-family: "Comic Sans MS", "Comic Sans", cursive, sans-serif !important;
+                font-size: clamp(2.4rem, 6vw, 4.2rem);
+                font-weight: 900;
+                color: #ff007f;
+                text-shadow: 3px 3px 0 #ffff00, -2px -2px 0 #00ffff;
+                text-align: center;
+                pointer-events: none;
+                user-select: none;
+                opacity: 1;
+                transform: rotate(-3deg);
+                transition: opacity 3s cubic-bezier(0.4, 0, 0.2, 1);
+            `;
+            overlay.appendChild(jokeText);
+
+            // Trigger reflow for clean transition
+            void jokeText.offsetWidth;
+
+            // 3. Fade away over the course of 3 seconds
+            jokeText.style.opacity = "0";
+            overlay.style.background = "rgba(0, 0, 0, 0)";
+            overlay.style.pointerEvents = "none";
+
+            // 4. Remove overlay element after 3 seconds
+            setTimeout(() => {
+                overlay.remove();
+            }, 3000);
+        }
+
+        const btnClose = modalBox.querySelector("#paywall-btn-close");
+        const btnPay = modalBox.querySelector("#paywall-btn-pay");
+
+        if (btnClose) {
+            btnClose.addEventListener("click", (e) => {
+                e.stopPropagation();
+                executePrank();
+            });
+        }
+
+        if (btnPay) {
+            btnPay.addEventListener("click", (e) => {
+                e.stopPropagation();
+                executePrank();
+            });
+        }
+    }
+
     function toggleTheme() {
         const isLight = document.body.classList.contains("light-theme");
-        applyTheme(isLight ? "dark" : "light");
+        if (isLight) {
+            applyTheme("dark");
+        } else {
+            showLightModePaywallJoke();
+        }
     }
 
     async function init() {
