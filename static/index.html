@@ -262,7 +262,7 @@
         <div class="modal-card modal-wide">
             <div class="modal-header">
                 <h2 id="auth-modal-title">Account &amp; Spotify Link</h2>
-                <button class="modal-close-btn" data-modal="modal-auth">&times;</button>
+                <button class="modal-close-btn" data-modal="modal-auth" onclick="document.getElementById('modal-auth').classList.add('hidden')">&times;</button>
             </div>
 
             <!-- Connected Profile View (when logged in) -->
@@ -370,7 +370,7 @@
                             </button>
                         </form>
                         <div style="margin-top: 10px; text-align: center;">
-                            <button id="btn-toggle-account-mode" style="background: none; border: none; font-size: 0.78rem; color: var(--color-spotify); cursor: pointer; text-decoration: underline;">
+                            <button type="button" id="btn-toggle-account-mode" style="background: none; border: none; font-size: 0.78rem; color: var(--color-spotify); cursor: pointer; text-decoration: underline;">
                                 Already have an account? Sign In
                             </button>
                         </div>
@@ -413,7 +413,7 @@
         <div class="modal-card modal-wide">
             <div class="modal-header">
                 <h2>Game Difficulty & Playlists</h2>
-                <button class="modal-close-btn" data-modal="modal-mode">&times;</button>
+                <button class="modal-close-btn" data-modal="modal-mode" onclick="document.getElementById('modal-mode').classList.add('hidden')">&times;</button>
             </div>
 
             <div class="modal-body-scroll">
@@ -493,7 +493,7 @@
         <div class="modal-card">
             <div class="modal-header">
                 <h2>Your Statistics</h2>
-                <button class="modal-close-btn" data-modal="modal-stats">&times;</button>
+                <button class="modal-close-btn" data-modal="modal-stats" onclick="document.getElementById('modal-stats').classList.add('hidden')">&times;</button>
             </div>
             
             <div class="stats-overview">

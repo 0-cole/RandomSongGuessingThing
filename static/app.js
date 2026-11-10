@@ -619,8 +619,8 @@ document.addEventListener("DOMContentLoaded", () => {
             if (unconnected) unconnected.classList.remove("hidden");
 
             // First visit prompt if not guest
-            if (!guest) {
-                openAuthModal();
+            if (!guest && !acc && !cookie) {
+                modalAuth.classList.remove("hidden");
             }
         }
     }
@@ -1375,7 +1375,6 @@ document.addEventListener("DOMContentLoaded", () => {
     let isSignUpMode = true;
 
     function openAuthModal() {
-        checkAccountState();
         modalAuth.classList.remove("hidden");
     }
 
@@ -1400,15 +1399,16 @@ document.addEventListener("DOMContentLoaded", () => {
     const btnSubmitAccount = document.getElementById("btn-submit-account");
 
     if (btnToggleAccountMode) {
-        btnToggleAccountMode.addEventListener("click", () => {
+        btnToggleAccountMode.addEventListener("click", (e) => {
+            if (e) e.preventDefault();
             isSignUpMode = !isSignUpMode;
             if (isSignUpMode) {
-                formAccTitle.textContent = "Create Your Permanent Account";
-                btnSubmitAccount.textContent = "Create Permanent Account & Play";
+                if (formAccTitle) formAccTitle.textContent = "Create Your Permanent Account";
+                if (btnSubmitAccount) btnSubmitAccount.textContent = "Create Permanent Account & Play";
                 btnToggleAccountMode.textContent = "Already have an account? Sign In";
             } else {
-                formAccTitle.textContent = "Sign In to Your Account";
-                btnSubmitAccount.textContent = "Sign In & Play";
+                if (formAccTitle) formAccTitle.textContent = "Sign In to Your Account";
+                if (btnSubmitAccount) btnSubmitAccount.textContent = "Sign In & Play";
                 btnToggleAccountMode.textContent = "Need an account? Sign Up";
             }
         });
@@ -1426,12 +1426,21 @@ document.addEventListener("DOMContentLoaded", () => {
                 return;
             }
             try {
+                if (!isSignUpMode) {
+                    // Sign In: save account, sync UI, and close modal
+                    localStorage.setItem("spotiless_account", JSON.stringify({ username: u, logged_in_at: Date.now() }));
+                    checkAccountState();
+                    showToast(`Signed in as ${u}! 🎉`);
+                    closeModals();
+                    return;
+                }
+
+                // Sign Up: save account, sync UI, guide to Spotify linking
                 localStorage.setItem("spotiless_account", JSON.stringify({ username: u, created_at: Date.now() }));
                 checkAccountState();
                 showToast(`Welcome, ${u}! Link Spotify below to sync your playlists.`);
                 const welcomeBanner = document.getElementById("account-welcome-banner");
                 if (welcomeBanner) welcomeBanner.classList.remove("hidden");
-                // Focus the cookie input to guide them smoothly
                 const inputSpdc = document.getElementById("input-connected-cookie-spdc");
                 if (inputSpdc) {
                     setTimeout(() => inputSpdc.focus(), 300);
@@ -1439,9 +1448,7 @@ document.addEventListener("DOMContentLoaded", () => {
             } catch (err) {
                 showToast("Failed to save account");
             }
-            return;
         });
-
     }
 
     // Cookie Linking
