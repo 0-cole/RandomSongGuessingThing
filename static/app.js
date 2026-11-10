@@ -165,7 +165,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 guesses: this.guesses,
                 is_won: this.isWon,
                 is_over: this.isOver,
-                pool_name: "🔥 Spotiless Top Hits (Cloud)",
+                pool_name: "🔥 Spoti-Less Top Hits (Cloud)",
                 total_songs: total,
                 song_index: songIdx,
                 session_won: this.stats.won,
@@ -183,7 +183,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     emojiRow += "⬜";
                 }
                 const scoreText = this.isWon ? `${this.attemptIndex + 1}/${this.stages.length}` : "X/6";
-                state.share_text = `Spotiless #${songIdx} ${scoreText}\n🔊 ${unlockedSec}s\n${emojiRow}\nhttps://github.com/0-cole/RandomSongGuessingThing`;
+                state.share_text = `Spoti-Less #${songIdx} ${scoreText}\n🔊 ${unlockedSec}s\n${emojiRow}\nhttps://github.com/0-cole/RandomSongGuessingThing`;
             }
 
             return state;
@@ -376,7 +376,7 @@ document.addEventListener("DOMContentLoaded", () => {
             await loadGameState();
             setInterval(refreshStatus, 3000);
         } catch (err) {
-            console.log("Starting Spotiless in Cloud Standalone Mode ☁️");
+            console.log("Starting Spoti-Less in Cloud Standalone Mode ☁️");
             isCloudMode = true;
             await CloudGameManager.init();
             refreshStatus();
@@ -390,7 +390,7 @@ document.addEventListener("DOMContentLoaded", () => {
             authStatusDot.className = "dot-connected";
             authUsernameLabel.textContent = "Cloud Mode";
             streakCounter.textContent = CloudGameManager.stats.current_streak || 0;
-            activePoolLabel.textContent = "🔥 Spotiless Hits";
+            activePoolLabel.textContent = "🔥 Spoti-Less Hits";
             if (navCounterPill) {
                 const total = CloudGameManager.tracks.length || 1;
                 const idx = (CloudGameManager.currentIndex % total) + 1;

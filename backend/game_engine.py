@@ -373,7 +373,7 @@ class GameEngine:
         total = len(self.track_pool)
         idx = len(self.played_track_ids)
         progress_str = f"Song {idx}/{total}"
-        return f"Songless Spotify ({self.playlist_name})\n{progress_str} • {status}\n{grid_str}\nStreak: {self.stats['current_streak']} 🔥"
+        return f"Spoti-Less ({self.playlist_name})\n{progress_str} • {status}\n{grid_str}\nStreak: {self.stats['current_streak']} 🔥"
 
     def search_candidates(self, query: str, limit: int = 8) -> List[Dict[str, Any]]:
         """Autocomplete search across the active track pool"""

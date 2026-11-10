@@ -85,7 +85,7 @@ def main():
         print("Opening default browser...")
         webbrowser.open(URL)
 
-    print("\n[!] Songless Desktop is running! Press Ctrl+C in this terminal to quit.")
+    print("\n[!] Spoti-Less Desktop is running! Press Ctrl+C in this terminal to quit.")
     try:
         while True:
             time.sleep(1)
