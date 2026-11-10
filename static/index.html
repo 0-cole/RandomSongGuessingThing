@@ -26,7 +26,7 @@
             } catch (e) {}
         })();
     </script>
-    <link rel="stylesheet" href="style.css?v=1.2.4">
+    <link rel="stylesheet" href="style.css?v=1.2.5">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400..800;1,9..40,400..800&family=Poppins:wght@600;700;800;900&display=swap" rel="stylesheet">
@@ -240,12 +240,26 @@
             <div id="auth-connected-view" class="connected-card hidden" style="margin-bottom: 16px;">
                 <div class="user-row" style="display: flex; align-items: center; gap: 12px; margin-bottom: 14px;">
                     <img id="user-avatar" src="https://i.scdn.co/image/ab6775700000ee853df25b81110cd06e8f62f064" alt="Avatar" class="avatar-img" style="width: 48px; height: 48px; border-radius: 50%;">
-                    <div>
-                        <h4 id="user-name-display" style="font-size: 1rem; font-weight: 700;">Account</h4>
+                    <div style="flex: 1; text-align: left;">
+                        <h4 id="user-name-display" style="font-size: 0.95rem; font-weight: 700; word-break: break-all; margin-bottom: 2px;">Account</h4>
                         <span id="user-tier-badge" class="premium-badge" style="background: var(--color-spotify); color: #000; font-size: 0.72rem; padding: 2px 7px; border-radius: 4px; font-weight: 800;">Spotify Linked</span>
                     </div>
                 </div>
-                <button id="btn-logout" class="btn btn-secondary btn-full btn-danger">Sign Out / Disconnect</button>
+
+                <!-- Inline Edit Username Form -->
+                <div id="box-edit-username" class="hidden" style="background: var(--bg-surface); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); margin-bottom: 12px; text-align: left;">
+                    <label style="display: block; font-size: 0.78rem; font-weight: 700; margin-bottom: 6px; color: var(--color-text-muted);">New Username</label>
+                    <div style="display: flex; gap: 6px;">
+                        <input type="text" id="input-new-username" placeholder="e.g. Cole" style="flex: 1; padding: 8px 10px; font-size: 0.85rem; background: var(--bg-surface-elevated); border: 1px solid var(--border-color); color: var(--color-text); border-radius: var(--radius-sm);">
+                        <button id="btn-save-new-username" class="btn btn-primary" style="padding: 8px 12px; font-size: 0.82rem; font-weight: 700;">Save</button>
+                        <button id="btn-cancel-edit-username" class="btn btn-secondary" style="padding: 8px 10px; font-size: 0.82rem;">Cancel</button>
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 8px; flex-direction: column;">
+                    <button id="btn-show-edit-username" class="btn btn-secondary btn-full" style="font-size: 0.85rem; font-weight: 700;">✏️ Change Username</button>
+                    <button id="btn-logout" class="btn btn-secondary btn-full btn-danger">Sign Out / Disconnect</button>
+                </div>
             </div>
 
             <!-- Unconnected Onboarding & Login View -->
@@ -468,7 +482,7 @@
     <!-- Toast Notification -->
     <div id="toast" class="toast hidden">Copied score to clipboard!</div>
 
-    <script src="audio_player.js?v=1.2.4"></script>
-    <script src="app.js?v=1.2.4"></script>
+    <script src="audio_player.js?v=1.2.5"></script>
+    <script src="app.js?v=1.2.5"></script>
 </body>
 </html>

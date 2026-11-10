@@ -1371,6 +1371,54 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
+    // Edit Username Handlers
+    const btnShowEditUsername = document.getElementById("btn-show-edit-username");
+    const boxEditUsername = document.getElementById("box-edit-username");
+    const inputNewUsername = document.getElementById("input-new-username");
+    const btnSaveNewUsername = document.getElementById("btn-save-new-username");
+    const btnCancelEditUsername = document.getElementById("btn-cancel-edit-username");
+
+    if (btnShowEditUsername && boxEditUsername) {
+        btnShowEditUsername.addEventListener("click", () => {
+            boxEditUsername.classList.toggle("hidden");
+            if (!boxEditUsername.classList.contains("hidden") && inputNewUsername) {
+                const acc = getStoredAccount();
+                inputNewUsername.value = acc && acc.username ? acc.username : "";
+                inputNewUsername.focus();
+            }
+        });
+    }
+
+    if (btnCancelEditUsername && boxEditUsername) {
+        btnCancelEditUsername.addEventListener("click", () => {
+            boxEditUsername.classList.add("hidden");
+        });
+    }
+
+    if (btnSaveNewUsername && inputNewUsername) {
+        btnSaveNewUsername.addEventListener("click", () => {
+            const newName = inputNewUsername.value.trim();
+            if (!newName) {
+                alert("Please enter a username.");
+                return;
+            }
+            const acc = getStoredAccount() || {};
+            acc.username = newName;
+            localStorage.setItem("spotiless_account", JSON.stringify(acc));
+            if (userNameDisplay) userNameDisplay.textContent = newName;
+            if (authUsernameLabel) authUsernameLabel.textContent = newName;
+            if (boxEditUsername) boxEditUsername.classList.add("hidden");
+            showToast(`Username updated to ${newName}! ✨`);
+        });
+
+        inputNewUsername.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") {
+                e.preventDefault();
+                btnSaveNewUsername.click();
+            }
+        });
+    }
+
     // Logout / Disconnect
     if (btnLogout) {
         btnLogout.addEventListener("click", async () => {
