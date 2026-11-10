@@ -10,6 +10,9 @@
  */
 
 document.addEventListener("DOMContentLoaded", () => {
+    // Immediate Mouse Reactivity & Spotlight
+    initMouseReactivity();
+
     // Audio Engine
     const audio = new window.MicroAudioEngine();
 
@@ -1767,30 +1770,55 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function initMouseReactivity() {
-        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
         let ticking = false;
         let mouseX = window.innerWidth / 2;
         let mouseY = window.innerHeight / 2;
 
-        window.addEventListener('mousemove', (e) => {
+        const updatePositions = () => {
+            const nx = (mouseX / window.innerWidth - 0.5) * 2;
+            const ny = (mouseY / window.innerHeight - 0.5) * 2;
+            const root = document.documentElement;
+            const body = document.body;
+
+            const offX = (nx * -24).toFixed(2) + 'px';
+            const offY = (ny * -24).toFixed(2) + 'px';
+            const waveX = (nx * -38).toFixed(2) + 'px';
+            const waveY = (ny * -38).toFixed(2) + 'px';
+            const pxX = mouseX.toFixed(1) + 'px';
+            const pxY = mouseY.toFixed(1) + 'px';
+
+            root.style.setProperty('--mouse-offset-x', offX);
+            root.style.setProperty('--mouse-offset-y', offY);
+            root.style.setProperty('--mouse-wave-x', waveX);
+            root.style.setProperty('--mouse-wave-y', waveY);
+            root.style.setProperty('--mouse-px-x', pxX);
+            root.style.setProperty('--mouse-px-y', pxY);
+
+            if (body) {
+                body.style.setProperty('--mouse-offset-x', offX);
+                body.style.setProperty('--mouse-offset-y', offY);
+                body.style.setProperty('--mouse-wave-x', waveX);
+                body.style.setProperty('--mouse-wave-y', waveY);
+                body.style.setProperty('--mouse-px-x', pxX);
+                body.style.setProperty('--mouse-px-y', pxY);
+            }
+            ticking = false;
+        };
+
+        const onMove = (e) => {
             mouseX = e.clientX;
             mouseY = e.clientY;
             if (!ticking) {
-                window.requestAnimationFrame(() => {
-                    const nx = (mouseX / window.innerWidth - 0.5) * 2;
-                    const ny = (mouseY / window.innerHeight - 0.5) * 2;
-                    const root = document.documentElement;
-                    root.style.setProperty('--mouse-offset-x', (nx * -14).toFixed(2) + 'px');
-                    root.style.setProperty('--mouse-offset-y', (ny * -14).toFixed(2) + 'px');
-                    root.style.setProperty('--mouse-wave-x', (nx * -22).toFixed(2) + 'px');
-                    root.style.setProperty('--mouse-wave-y', (ny * -22).toFixed(2) + 'px');
-                    root.style.setProperty('--mouse-px-x', mouseX + 'px');
-                    root.style.setProperty('--mouse-px-y', mouseY + 'px');
-                    ticking = false;
-                });
+                window.requestAnimationFrame(updatePositions);
                 ticking = true;
             }
-        }, { passive: true });
+        };
+
+        window.addEventListener('mousemove', onMove, { passive: true });
+        window.addEventListener('pointermove', onMove, { passive: true });
+
+        // Initial center placement
+        updatePositions();
     }
 
     // Launch App: register event listeners synchronously on millisecond 0
