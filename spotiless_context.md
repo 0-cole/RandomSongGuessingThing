@@ -18,7 +18,7 @@
 
 ## 1. Executive Summary & High-Level Objective
 - **Project**: Spotiless (Songless — Spotify Edition), an endless music guessing game inspired by *Songless* (Lessgames) with microsecond-accurate snippet intervals (0.1s → 0.25s → 0.5s → 1.0s → 2.0s → 5.0s).
-- **Current Version**: `v1.4.0` (Unified GitHub Cloud & Local Native Release)
+- **Current Version**: `v1.4.1` (Unified GitHub Cloud & Local Native Release)
 - **Official Branding**: **Spoti-Less** in-app / **Spotiless** for domain and repository links.
 - **Dual Architecture**:
   1. **Desktop Native Mode (`launcher.py` / `127.0.0.1:4321`)**: 100% Native Spotify Shannon cipher streaming over TCP port 4070 (`ap-gae2.spotify.com:4070`) using cached Librespot playback tokens and personal Spotify user libraries. Works even through school firewalls and FortiGuard blocks.
@@ -44,16 +44,18 @@
   - Ubiquitous Terms of Service & Privacy Policy modal (`#modal-privacy`) accessible via top navigation shield button (`#btn-nav-privacy`) and footer.
   - Data deletion copy preserved; wipe button earmarked for upcoming Settings menu.
 
-## 3. Recent Modifications & Verified State (`v1.4.0`)
-- [`backend/app.py`](file:///d:/DOWNLOAD/RandomSongGuessingThing/backend/app.py): Bumped version to `v1.4.0`.
-- [`static/style.css`](file:///d:/DOWNLOAD/RandomSongGuessingThing/static/style.css):
-  - Completely removed all mouse reactivity, masks, and magnifying overlay layers.
-  - Retained the clean, hardware-accelerated floating Spotify logo pattern (`body::before`) and traveling crowd wave (`body::after`).
-  - Background is steady, floating naturally down-right with zero afterimages, zero green halos, and zero cursor dot overlays.
-- [`static/app.js`](file:///d:/DOWNLOAD/RandomSongGuessingThing/static/app.js):
-  - Completely removed `initMouseReactivity()` and mousemove listeners.
+## 3. Recent Modifications & Verified State (`v1.4.1`)
+- [`backend/app.py`](file:///d:/DOWNLOAD/RandomSongGuessingThing/backend/app.py): Bumped version to `v1.4.1`.
 - [`static/index.html`](file:///d:/DOWNLOAD/RandomSongGuessingThing/static/index.html):
-  - Removed `#bg-magnifier` DOM node and bumped cache query strings to `?v=1.3.7`.
+  - Added `onsubmit="return false;"` to `#form-local-account` to prevent default browser GET reloads that caused modals to "close like a ghost".
+  - Made password field explicitly optional so users can log in / sign up using just a username or email.
+  - Bumped cache busters to `?v=1.4.1`.
+- [`static/app.js`](file:///d:/DOWNLOAD/RandomSongGuessingThing/static/app.js):
+  - Completely overhauled local account & Spotify linking controller with `handleAccountSubmit()`.
+  - Added full support for both username and email input (`cdblair418@gmail.com`), saving to `localStorage` and immediately updating the connected card.
+  - Keeps the `#modal-auth` open upon sign-in/up, seamlessly transitioning to `#auth-connected-view` and prompting for Spotify cookie connection or Free Guest Play.
+  - Wired `#btn-show-edit-username`, `#btn-show-edit-username-bottom`, and `#btn-save-new-username` to allow editing/resetting username at any time.
+  - Fixed `#btn-logout` to properly wipe user credentials and cleanly restore the sign-in modal.
 
 ## 4. Immediate Next Steps
 - Full unified gameplay verified across both Local Desktop launcher and Cloud Vercel deployment.

@@ -32,7 +32,7 @@
             } catch (e) {}
         })();
     </script>
-    <link rel="stylesheet" href="style.css?v=1.4.0">
+    <link rel="stylesheet" href="style.css?v=1.4.1">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400..800;1,9..40,400..800&family=Poppins:wght@600;700;800;900&display=swap" rel="stylesheet">
@@ -435,14 +435,14 @@
                         <p id="form-acc-desc" style="font-size: 0.78rem; color: var(--color-text-muted); margin-bottom: 12px;">
                             Permanently links your Spotify session, streaks, and custom playlists on this device.
                         </p>
-                        <form id="form-local-account" style="display: flex; flex-direction: column; gap: 10px;">
+                        <form id="form-local-account" onsubmit="return false;" style="display: flex; flex-direction: column; gap: 10px;">
                             <div>
                                 <label id="label-acc-user" style="display: block; font-size: 0.76rem; font-weight: 700; margin-bottom: 4px; color: var(--color-text-muted);">Username or Email</label>
                                 <input type="text" id="acc-username-input" required placeholder="Choose a username or email" style="width: 100%; box-sizing: border-box; padding: 10px 12px; font-size: 0.85rem; background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--color-text); border-radius: var(--radius-sm);">
                             </div>
                             <div>
-                                <label style="display: block; font-size: 0.76rem; font-weight: 700; margin-bottom: 4px; color: var(--color-text-muted);">Password</label>
-                                <input type="password" id="acc-password-input" required placeholder="Choose a password" style="width: 100%; box-sizing: border-box; padding: 10px 12px; font-size: 0.85rem; background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--color-text); border-radius: var(--radius-sm);">
+                                <label style="display: block; font-size: 0.76rem; font-weight: 700; margin-bottom: 4px; color: var(--color-text-muted);">Password <span style="font-size: 0.7rem; font-weight: normal; color: var(--color-text-subtle);">(optional)</span></label>
+                                <input type="password" id="acc-password-input" placeholder="Choose a password (optional)" style="width: 100%; box-sizing: border-box; padding: 10px 12px; font-size: 0.85rem; background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--color-text); border-radius: var(--radius-sm);">
                             </div>
                             <button type="submit" id="btn-submit-account" class="btn btn-primary btn-full" style="font-weight: 800; margin-top: 4px;">
                                 Create Permanent Account &amp; Play
@@ -643,7 +643,7 @@
     <!-- Toast Notification -->
     <div id="toast" class="toast hidden">Copied score to clipboard!</div>
 
-    <script src="audio_player.js?v=1.4.0"></script>
-    <script src="app.js?v=1.4.0"></script>
+    <script src="audio_player.js?v=1.4.1"></script>
+    <script src="app.js?v=1.4.1"></script>
 </body>
 </html>
