@@ -1437,27 +1437,51 @@ document.addEventListener("DOMContentLoaded", () => {
             e.preventDefault();
             const usernameInput = document.getElementById("acc-username-input");
             const passwordInput = document.getElementById("acc-password-input");
-            const u = (usernameInput?.value || "").trim();
+            const rawUser = (usernameInput?.value || "").trim();
             const p = (passwordInput?.value || "").trim();
-            if (!u || !p) {
-                showToast("Please enter a username and password");
+            if (!rawUser || !p) {
+                showToast("Please enter a username or email and password");
                 return;
             }
             try {
+                // Support both email and username: if email is typed, extract clean display handle
+                let displayName = rawUser;
+                let emailStr = "";
+                if (rawUser.includes("@")) {
+                    emailStr = rawUser;
+                    displayName = rawUser.split("@")[0].trim() || rawUser;
+                }
+
                 const isSigningIn = (window.isSignUpMode === false);
+                const existingAcc = getStoredAccount() || {};
+
                 if (isSigningIn) {
                     // Sign In: save account, sync UI, and close modal immediately
-                    localStorage.setItem("spotiless_account", JSON.stringify({ username: u, logged_in_at: Date.now() }));
+                    const acc = {
+                        ...existingAcc,
+                        username: displayName,
+                        email: emailStr || existingAcc.email || "",
+                        raw_input: rawUser,
+                        logged_in_at: Date.now()
+                    };
+                    localStorage.setItem("spotiless_account", JSON.stringify(acc));
                     checkAccountState();
-                    showToast(`Signed in as ${u}! 🎉`);
+                    showToast(`Signed in as ${displayName}! 🎉`);
                     closeModals();
                     return;
                 }
 
                 // Sign Up: save account, sync UI, guide to Spotify linking
-                localStorage.setItem("spotiless_account", JSON.stringify({ username: u, created_at: Date.now() }));
+                const acc = {
+                    ...existingAcc,
+                    username: displayName,
+                    email: emailStr || existingAcc.email || "",
+                    raw_input: rawUser,
+                    created_at: Date.now()
+                };
+                localStorage.setItem("spotiless_account", JSON.stringify(acc));
                 checkAccountState();
-                showToast(`Welcome, ${u}! Link Spotify below to sync your playlists.`);
+                showToast(`Welcome, ${displayName}! Link Spotify below to sync your playlists.`);
                 const welcomeBanner = document.getElementById("account-welcome-banner");
                 if (welcomeBanner) welcomeBanner.classList.remove("hidden");
                 const inputSpdc = document.getElementById("input-connected-cookie-spdc");

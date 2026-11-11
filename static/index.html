@@ -32,7 +32,7 @@
             } catch (e) {}
         })();
     </script>
-    <link rel="stylesheet" href="style.css?v=1.3.8">
+    <link rel="stylesheet" href="style.css?v=1.3.9">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400..800;1,9..40,400..800&family=Poppins:wght@600;700;800;900&display=swap" rel="stylesheet">
@@ -82,24 +82,27 @@
                 }
             }
 
+            const userLabel = document.getElementById("label-acc-user");
             if (isSignUp) {
                 if (title) title.textContent = "Create Your Permanent Account";
                 if (desc) desc.textContent = "Permanently links your Spotify session, streaks, and custom playlists on this device.";
                 if (btnSubmit) btnSubmit.textContent = "Create Permanent Account & Play";
                 if (btnToggle) btnToggle.textContent = "Already have an account? Sign In";
-                if (userInput) userInput.placeholder = "Choose a username";
+                if (userLabel) userLabel.textContent = "Username or Email";
+                if (userInput) userInput.placeholder = "Choose a username or email";
                 if (passInput) passInput.placeholder = "Choose a password";
             } else {
                 if (title) title.textContent = "Sign In to Your Account";
-                if (desc) desc.textContent = "Sign in with your username to restore your session and playlists on this device.";
+                if (desc) desc.textContent = "Sign in with your username or email to restore your session and playlists on this device.";
                 if (btnSubmit) btnSubmit.textContent = "Sign In & Play";
                 if (btnToggle) btnToggle.textContent = "Need an account? Sign Up";
+                if (userLabel) userLabel.textContent = "Username or Email";
                 if (userInput) {
-                    userInput.placeholder = "Enter your username";
+                    userInput.placeholder = "Enter your username or email";
                     try {
                         const acc = JSON.parse(localStorage.getItem('spotiless_account') || '{}');
-                        if (acc.username && !userInput.value) {
-                            userInput.value = acc.username;
+                        if ((acc.username || acc.email) && !userInput.value) {
+                            userInput.value = acc.username || acc.email;
                         }
                     } catch (e) {}
                 }
@@ -426,8 +429,8 @@
                         </p>
                         <form id="form-local-account" style="display: flex; flex-direction: column; gap: 10px;">
                             <div>
-                                <label style="display: block; font-size: 0.76rem; font-weight: 700; margin-bottom: 4px; color: var(--color-text-muted);">Username</label>
-                                <input type="text" id="acc-username-input" required placeholder="Choose a username" style="width: 100%; box-sizing: border-box; padding: 10px 12px; font-size: 0.85rem; background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--color-text); border-radius: var(--radius-sm);">
+                                <label id="label-acc-user" style="display: block; font-size: 0.76rem; font-weight: 700; margin-bottom: 4px; color: var(--color-text-muted);">Username or Email</label>
+                                <input type="text" id="acc-username-input" required placeholder="Choose a username or email" style="width: 100%; box-sizing: border-box; padding: 10px 12px; font-size: 0.85rem; background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--color-text); border-radius: var(--radius-sm);">
                             </div>
                             <div>
                                 <label style="display: block; font-size: 0.76rem; font-weight: 700; margin-bottom: 4px; color: var(--color-text-muted);">Password</label>
@@ -632,7 +635,7 @@
     <!-- Toast Notification -->
     <div id="toast" class="toast hidden">Copied score to clipboard!</div>
 
-    <script src="audio_player.js?v=1.3.8"></script>
-    <script src="app.js?v=1.3.8"></script>
+    <script src="audio_player.js?v=1.3.9"></script>
+    <script src="app.js?v=1.3.9"></script>
 </body>
 </html>

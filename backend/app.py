@@ -14,7 +14,7 @@ from backend.game_engine import GameEngine
 
 STATIC_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
 
-__version__ = '1.3.8'
+__version__ = '1.3.9'
 
 app = Flask(__name__, static_folder=STATIC_DIR)
 
