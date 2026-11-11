@@ -105,7 +105,7 @@ body {
 }
 
 /* Ensure no intrusive cursor dots or standalone dot followers appear */
-#cursor-dot, .cursor-dot, #mouse-dot, .mouse-dot, #cursor-follower, .cursor-follower, #custom-cursor, .custom-cursor, .cursor-trail, #bg-magnifier {
+#cursor-dot, .cursor-dot, #mouse-dot, .mouse-dot, #cursor-follower, .cursor-follower, #custom-cursor, .custom-cursor, .cursor-trail {
     display: none !important;
     opacity: 0 !important;
     pointer-events: none !important;
@@ -116,11 +116,73 @@ html, body {
     cursor: auto !important;
 }
 
-/* Single-layer interactive background canvas renders the pattern and smoothly scales individual logos near cursor */
-body::before,
+/* 1. Base floating Spotify logo pattern (stationary alignment; masked OUT in the mouse circle to eliminate afterimages) */
+body::before {
+    content: "";
+    position: fixed;
+    top: -40px;
+    left: -40px;
+    width: calc(100% + 80px);
+    height: calc(100% + 80px);
+    pointer-events: none;
+    z-index: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64' viewBox='0 0 64 64'%3E%3Cpath fill='%231db954' transform='translate(5.2, 5.2) scale(0.9) rotate(28, 12, 12)' d='M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.48.66.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z'/%3E%3Cpath fill='%231db954' transform='translate(37.2, 37.2) scale(0.9) rotate(28, 12, 12)' d='M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.48.66.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z'/%3E%3Ccircle cx='48' cy='16' r='3.2' fill='%231db954' opacity='0.7'/%3E%3Ccircle cx='16' cy='48' r='2.5' fill='%231db954' opacity='0.7'/%3E%3Ccircle cx='32' cy='2' r='1.5' fill='%231db954' opacity='0.5'/%3E%3Ccircle cx='2' cy='32' r='1.5' fill='%231db954' opacity='0.5'/%3E%3C/svg%3E");
+    background-repeat: repeat;
+    background-size: 64px 64px;
+    opacity: var(--spotify-pattern-opacity, 0.08);
+    transform: none !important;
+    animation: spotifyPatternFloat 22s linear infinite;
+    -webkit-mask-image: radial-gradient(circle 175px at var(--mouse-px-x, -9999px) var(--mouse-px-y, -9999px), transparent 0%, transparent 45%, black 80%);
+    mask-image: radial-gradient(circle 175px at var(--mouse-px-x, -9999px) var(--mouse-px-y, -9999px), transparent 0%, transparent 45%, black 80%);
+    will-change: background-position, -webkit-mask-image, mask-image;
+}
+
+/* 2. Traveling Crowd Wave (stationary alignment; masked OUT in the mouse circle) */
 body::after {
-    display: none !important;
-    content: none !important;
+    content: "";
+    position: fixed;
+    top: -40px;
+    left: -40px;
+    width: calc(100% + 80px);
+    height: calc(100% + 80px);
+    pointer-events: none;
+    z-index: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64' viewBox='0 0 64 64'%3E%3Cpath fill='%231ed760' transform='translate(3.52, 3.52) scale(1.04) rotate(28, 12, 12)' d='M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.48.66.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z'/%3E%3Cpath fill='%231ed760' transform='translate(35.52, 35.52) scale(1.04) rotate(28, 12, 12)' d='M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.48.66.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z'/%3E%3Ccircle cx='48' cy='16' r='3.6' fill='%231ed760' opacity='0.85'/%3E%3Ccircle cx='16' cy='48' r='2.9' fill='%231ed760' opacity='0.85'/%3E%3Ccircle cx='32' cy='2' r='1.7' fill='%231ed760' opacity='0.65'/%3E%3Ccircle cx='2' cy='32' r='1.7' fill='%231ed760' opacity='0.65'/%3E%3C/svg%3E");
+    background-repeat: repeat;
+    background-size: 64px 64px;
+    opacity: var(--spotify-wave-opacity, 0.35);
+    transform: none !important;
+    animation: spotifyPatternFloat 22s linear infinite, spotifyCrowdWave 6.5s linear infinite;
+    -webkit-mask-image: radial-gradient(circle 175px at var(--mouse-px-x, -9999px) var(--mouse-px-y, -9999px), transparent 0%, transparent 45%, black 80%), linear-gradient(135deg, transparent 0%, transparent 34%, rgba(0, 0, 0, 0.45) 43%, #000 50%, rgba(0, 0, 0, 0.45) 57%, transparent 66%, transparent 100%);
+    mask-image: radial-gradient(circle 175px at var(--mouse-px-x, -9999px) var(--mouse-px-y, -9999px), transparent 0%, transparent 45%, black 80%), linear-gradient(135deg, transparent 0%, transparent 34%, rgba(0, 0, 0, 0.45) 43%, #000 50%, rgba(0, 0, 0, 0.45) 57%, transparent 66%, transparent 100%);
+    -webkit-mask-composite: destination-in, source-over;
+    mask-composite: intersect;
+    -webkit-mask-size: 100% 100%, 350% 350%;
+    mask-size: 100% 100%, 350% 350%;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    will-change: background-position, -webkit-mask-image, mask-image;
+}
+
+/* 3. Magnified Pattern Layer: ONLY visible in the circular mouse area, smoothly scaled up without ghosting */
+#bg-magnifier {
+    position: fixed;
+    top: -40px;
+    left: -40px;
+    width: calc(100% + 80px);
+    height: calc(100% + 80px);
+    pointer-events: none;
+    z-index: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64' viewBox='0 0 64 64'%3E%3Cpath fill='%231db954' transform='translate(5.2, 5.2) scale(0.9) rotate(28, 12, 12)' d='M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.48.66.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z'/%3E%3Cpath fill='%231db954' transform='translate(37.2, 37.2) scale(0.9) rotate(28, 12, 12)' d='M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.48.66.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z'/%3E%3Ccircle cx='48' cy='16' r='3.2' fill='%231db954' opacity='0.7'/%3E%3Ccircle cx='16' cy='48' r='2.5' fill='%231db954' opacity='0.7'/%3E%3Ccircle cx='32' cy='2' r='1.5' fill='%231db954' opacity='0.5'/%3E%3Ccircle cx='2' cy='32' r='1.5' fill='%231db954' opacity='0.5'/%3E%3C/svg%3E");
+    background-repeat: repeat;
+    background-size: 64px 64px;
+    animation: spotifyPatternFloat 22s linear infinite;
+    opacity: var(--spotify-pattern-opacity, 0.08);
+    transform-origin: var(--mouse-px-x, 50%) var(--mouse-px-y, 50%);
+    transform: scale(1.35);
+    -webkit-mask-image: radial-gradient(circle 175px at var(--mouse-px-x, -9999px) var(--mouse-px-y, -9999px), black 0%, black 45%, transparent 80%);
+    mask-image: radial-gradient(circle 175px at var(--mouse-px-x, -9999px) var(--mouse-px-y, -9999px), black 0%, black 45%, transparent 80%);
+    will-change: transform-origin, -webkit-mask-image, mask-image;
 }
 
 /* Background floating Spotify logo & bubble pattern moving down and to the right */
