@@ -354,11 +354,14 @@ document.addEventListener("DOMContentLoaded", () => {
     drawVisualizer();
 
     // ----------------- Interactive Mouse Background System -----------------
-    // Pattern stays completely still (no shifting); tiles locally expand in size near the mouse; zero green glow.
-    function initMouseBackgroundReactivity() {
-        // 1. Purge any existing green dot or custom cursor follower elements from DOM
-        const purgeStaleDots = () => {
+    // Native CSS background (body::before & body::after) stays completely stationary.
+    // #bg-magnifier slightly increases the pattern size only where your mouse is.
+    // Zero green glow or intrusive dots.
+    function initMouseMagnifier() {
+        // 1. Purge any stale canvas or custom cursor dot elements from DOM
+        const purgeStale = () => {
             const staleSelectors = [
+                "#interactive-bg-canvas",
                 "#cursor-dot", ".cursor-dot",
                 "#mouse-dot", ".mouse-dot",
                 "#cursor-follower", ".cursor-follower",
@@ -370,124 +373,48 @@ document.addEventListener("DOMContentLoaded", () => {
             if (document.body) document.body.style.cursor = "auto";
             if (document.documentElement) document.documentElement.style.cursor = "auto";
         };
-        purgeStaleDots();
-        const observer = new MutationObserver(() => purgeStaleDots());
+        purgeStale();
+        const observer = new MutationObserver(() => purgeStale());
         observer.observe(document.body || document.documentElement, { childList: true, subtree: true });
 
-        // 2. Setup full-screen fixed background canvas
-        let bgCanvas = document.getElementById("interactive-bg-canvas");
-        if (!bgCanvas) {
-            bgCanvas = document.createElement("canvas");
-            bgCanvas.id = "interactive-bg-canvas";
-            bgCanvas.style.cssText = `
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 100vw;
-                height: 100vh;
-                pointer-events: none;
-                z-index: 0;
-                overflow: hidden;
-            `;
-            document.body.insertBefore(bgCanvas, document.body.firstChild);
-        }
+        let ticking = false;
+        let mouseX = -9999;
+        let mouseY = -9999;
+        const root = document.documentElement;
 
-        const bgCtx = bgCanvas.getContext("2d");
-        let width = (bgCanvas.width = window.innerWidth);
-        let height = (bgCanvas.height = window.innerHeight);
-
-        const onResize = () => {
-            width = bgCanvas.width = window.innerWidth;
-            height = bgCanvas.height = window.innerHeight;
+        const updatePositions = () => {
+            root.style.setProperty("--mouse-px-x", `${mouseX.toFixed(1)}px`);
+            root.style.setProperty("--mouse-px-y", `${mouseY.toFixed(1)}px`);
+            ticking = false;
         };
-        window.addEventListener("resize", onResize, { passive: true });
 
-        // Preload clean Spotify logo pattern tile (exact 64x64 SVG)
-        const tileSvg = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64' viewBox='0 0 64 64'%3E%3Cpath fill='%231db954' transform='translate(5.2, 5.2) scale(0.9) rotate(28, 12, 12)' d='M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.48.66.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z'/%3E%3Cpath fill='%231db954' transform='translate(37.2, 37.2) scale(0.9) rotate(28, 12, 12)' d='M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.48.66.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z'/%3E%3Ccircle cx='48' cy='16' r='3.2' fill='%231db954' opacity='0.7'/%3E%3Ccircle cx='16' cy='48' r='2.5' fill='%231db954' opacity='0.7'/%3E%3Ccircle cx='32' cy='2' r='1.5' fill='%231db954' opacity='0.5'/%3E%3Ccircle cx='2' cy='32' r='1.5' fill='%231db954' opacity='0.5'/%3E%3C/svg%3E`;
-        const tileImg = new Image();
-        tileImg.src = tileSvg;
-
-        // Mouse coordinates & activity tracking
-        let targetX = -9999;
-        let targetY = -9999;
-        let currentX = -9999;
-        let currentY = -9999;
-        let isMouseActive = false;
-
-        const onMouseMove = (x, y) => {
-            targetX = x;
-            targetY = y;
-            if (!isMouseActive) {
-                currentX = x;
-                currentY = y;
+        const onMove = (e) => {
+            mouseX = e.clientX;
+            mouseY = e.clientY;
+            if (!ticking) {
+                window.requestAnimationFrame(updatePositions);
+                ticking = true;
             }
-            isMouseActive = true;
         };
 
-        window.addEventListener("mousemove", (e) => onMouseMove(e.clientX, e.clientY), { passive: true });
+        window.addEventListener("mousemove", onMove, { passive: true });
+        window.addEventListener("pointermove", onMove, { passive: true });
         window.addEventListener("touchmove", (e) => {
-            if (e.touches && e.touches[0]) onMouseMove(e.touches[0].clientX, e.touches[0].clientY);
+            if (e.touches && e.touches[0]) onMove(e.touches[0]);
         }, { passive: true });
+
         document.addEventListener("mouseleave", () => {
-            isMouseActive = false;
-            targetX = -9999;
-            targetY = -9999;
+            mouseX = -9999;
+            mouseY = -9999;
+            if (!ticking) {
+                window.requestAnimationFrame(updatePositions);
+                ticking = true;
+            }
         });
-
-        const tileSize = 64;
-        const interactionRadius = 175; // area around mouse where pattern slightly increases in size
-
-        function renderPattern() {
-            requestAnimationFrame(renderPattern);
-
-            // Smoothly track mouse position for fluid size scaling
-            if (isMouseActive) {
-                currentX += (targetX - currentX) * 0.16;
-                currentY += (targetY - currentY) * 0.16;
-            }
-
-            bgCtx.clearRect(0, 0, width, height);
-
-            const isDark = !document.body.classList.contains("light-theme");
-            // Zero green glow or background tint — strictly clean pattern opacity
-            bgCtx.globalAlpha = isDark ? 0.08 : 0.06;
-
-            const cols = Math.ceil(width / tileSize) + 1;
-            const rows = Math.ceil(height / tileSize) + 1;
-
-            // Pattern grid is completely stationary (no moving, no shifting)
-            for (let r = 0; r < rows; r++) {
-                for (let c = 0; c < cols; c++) {
-                    const cx = c * tileSize + tileSize / 2;
-                    const cy = r * tileSize + tileSize / 2;
-
-                    // Calculate local magnification for tiles near the cursor
-                    let scale = 1.0;
-                    if (isMouseActive) {
-                        const dist = Math.hypot(cx - currentX, cy - currentY);
-                        if (dist < interactionRadius) {
-                            // Smooth cosine falloff from 1.0 (center) to 0.0 (edge)
-                            const factor = Math.cos((dist / interactionRadius) * (Math.PI / 2));
-                            scale = 1.0 + factor * 0.42; // slightly increases in size in the mouse area
-                        }
-                    }
-
-                    bgCtx.save();
-                    bgCtx.translate(cx, cy);
-                    if (scale !== 1.0) {
-                        bgCtx.scale(scale, scale);
-                    }
-                    bgCtx.drawImage(tileImg, -tileSize / 2, -tileSize / 2, tileSize, tileSize);
-                    bgCtx.restore();
-                }
-            }
-        }
-
-        renderPattern();
     }
 
-    // Initialize interactive mouse background reactivity immediately
-    initMouseBackgroundReactivity();
+    // Initialize local mouse background magnifier immediately
+    initMouseMagnifier();
 
     // ----------------- Initialization -----------------
     // ----------------- Theme Management -----------------
