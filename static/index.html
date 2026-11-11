@@ -32,7 +32,7 @@
             } catch (e) {}
         })();
     </script>
-    <link rel="stylesheet" href="style.css?v=1.3.9">
+    <link rel="stylesheet" href="style.css?v=1.4.0">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400..800;1,9..40,400..800&family=Poppins:wght@600;700;800;900&display=swap" rel="stylesheet">
@@ -163,7 +163,7 @@
                 </button>
                 <button id="btn-open-auth" class="nav-pill nav-auth-pill" title="Spotify Account" onclick="document.getElementById('modal-auth').classList.remove('hidden')">
                     <span id="auth-status-dot" class="dot-disconnected"></span>
-                    <span id="auth-username-label">Spotify</span>
+                    <span id="auth-username-label">Connect Spotify</span>
                 </button>
             </div>
         </header>
@@ -348,6 +348,9 @@
                     </div>
                 </div>
 
+                <!-- Welcome Banner for newly signed-in users -->
+                <div id="account-welcome-banner" class="hidden" style="background: rgba(29, 185, 84, 0.15); border: 1px solid var(--color-spotify); border-radius: var(--radius-sm); padding: 10px 12px; margin-bottom: 12px; font-size: 0.82rem; color: #fff; font-weight: 600; text-align: left;"></div>
+
                 <!-- Connect / Link Spotify Section for Logged-in Users -->
                 <div id="account-spotify-link-box" style="background: var(--bg-surface-elevated); padding: 14px; border-radius: var(--radius-md); border: 1px solid var(--border-color); margin-bottom: 14px; text-align: left;">
                     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
@@ -377,6 +380,11 @@
                                 <li>Find and copy the value of <code>sp_dc</code>, then paste it above!</li>
                             </ol>
                         </details>
+                        <div style="margin-top: 10px; border-top: 1px solid var(--border-color); padding-top: 10px;">
+                            <button type="button" class="btn btn-secondary btn-full" onclick="document.getElementById('modal-auth').classList.add('hidden')" style="font-weight: 700; font-size: 0.85rem;">
+                                ▶ Play Free Hits Now (Skip Spotify Link)
+                            </button>
+                        </div>
                     </div>
 
                     <!-- Linked State: Show Connected Status & Disconnect Option -->
@@ -635,7 +643,7 @@
     <!-- Toast Notification -->
     <div id="toast" class="toast hidden">Copied score to clipboard!</div>
 
-    <script src="audio_player.js?v=1.3.9"></script>
-    <script src="app.js?v=1.3.9"></script>
+    <script src="audio_player.js?v=1.4.0"></script>
+    <script src="app.js?v=1.4.0"></script>
 </body>
 </html>

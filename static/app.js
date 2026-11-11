@@ -636,8 +636,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     async function refreshStatus() {
         if (isCloudMode) {
-            authStatusDot.className = "dot-connected";
-            authUsernameLabel.textContent = "Cloud Mode";
+            checkAccountState();
             streakCounter.textContent = CloudGameManager.stats.current_streak || 0;
             activePoolLabel.textContent = "🔥 Spoti-Less Hits";
             if (navCounterPill) {
@@ -1456,7 +1455,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 const existingAcc = getStoredAccount() || {};
 
                 if (isSigningIn) {
-                    // Sign In: save account, sync UI, and close modal immediately
+                    // Sign In: save account, sync UI
                     const acc = {
                         ...existingAcc,
                         username: displayName,
@@ -1466,8 +1465,24 @@ document.addEventListener("DOMContentLoaded", () => {
                     };
                     localStorage.setItem("spotiless_account", JSON.stringify(acc));
                     checkAccountState();
-                    showToast(`Signed in as ${displayName}! 🎉`);
-                    closeModals();
+
+                    // If Spotify is already linked, close modal and let them play!
+                    if (localStorage.getItem("spotiless_sp_dc")) {
+                        showToast(`Signed in as ${displayName}! 🎉`);
+                        closeModals();
+                    } else {
+                        // Prompt directly to connect Spotify!
+                        showToast(`Signed in as ${displayName}! Connect Spotify below.`);
+                        const welcomeBanner = document.getElementById("account-welcome-banner");
+                        if (welcomeBanner) {
+                            welcomeBanner.textContent = `👋 Welcome back, ${displayName}! Connect your Spotify below to play your personal playlists, or tap Play Free Hits.`;
+                            welcomeBanner.classList.remove("hidden");
+                        }
+                        const inputSpdc = document.getElementById("input-connected-cookie-spdc");
+                        if (inputSpdc) {
+                            setTimeout(() => inputSpdc.focus(), 300);
+                        }
+                    }
                     return;
                 }
 
@@ -1481,9 +1496,12 @@ document.addEventListener("DOMContentLoaded", () => {
                 };
                 localStorage.setItem("spotiless_account", JSON.stringify(acc));
                 checkAccountState();
-                showToast(`Welcome, ${displayName}! Link Spotify below to sync your playlists.`);
+                showToast(`Welcome, ${displayName}! Connect Spotify below.`);
                 const welcomeBanner = document.getElementById("account-welcome-banner");
-                if (welcomeBanner) welcomeBanner.classList.remove("hidden");
+                if (welcomeBanner) {
+                    welcomeBanner.textContent = `🎉 Account created for ${displayName}! Connect your Spotify below to link your playlists, or play free hits now.`;
+                    welcomeBanner.classList.remove("hidden");
+                }
                 const inputSpdc = document.getElementById("input-connected-cookie-spdc");
                 if (inputSpdc) {
                     setTimeout(() => inputSpdc.focus(), 300);
@@ -1513,6 +1531,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 showToast("Spotify linked successfully! 🍪");
                 checkAccountState();
                 if (inputConnectedCookieSpdc) inputConnectedCookieSpdc.value = "";
+                closeModals();
             } catch (e) {
                 showToast("Failed to save cookie");
             }
