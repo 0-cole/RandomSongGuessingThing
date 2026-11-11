@@ -1397,19 +1397,37 @@ document.addEventListener("DOMContentLoaded", () => {
     const btnToggleAccountMode = document.getElementById("btn-toggle-account-mode");
     const formAccTitle = document.getElementById("form-acc-title");
     const btnSubmitAccount = document.getElementById("btn-submit-account");
+    const tabModeSignUp = document.getElementById("tab-mode-signup");
+    const tabModeSignIn = document.getElementById("tab-mode-signin");
+
+    if (tabModeSignUp) {
+        tabModeSignUp.addEventListener("click", () => {
+            if (window.setAccountMode) window.setAccountMode("signup");
+        });
+    }
+    if (tabModeSignIn) {
+        tabModeSignIn.addEventListener("click", () => {
+            if (window.setAccountMode) window.setAccountMode("signin");
+        });
+    }
 
     if (btnToggleAccountMode) {
         btnToggleAccountMode.addEventListener("click", (e) => {
             if (e) e.preventDefault();
-            isSignUpMode = !isSignUpMode;
-            if (isSignUpMode) {
-                if (formAccTitle) formAccTitle.textContent = "Create Your Permanent Account";
-                if (btnSubmitAccount) btnSubmitAccount.textContent = "Create Permanent Account & Play";
-                btnToggleAccountMode.textContent = "Already have an account? Sign In";
+            if (window.toggleAccountAuthMode) {
+                window.toggleAccountAuthMode(e);
             } else {
-                if (formAccTitle) formAccTitle.textContent = "Sign In to Your Account";
-                if (btnSubmitAccount) btnSubmitAccount.textContent = "Sign In & Play";
-                btnToggleAccountMode.textContent = "Need an account? Sign Up";
+                isSignUpMode = !isSignUpMode;
+                window.isSignUpMode = isSignUpMode;
+                if (isSignUpMode) {
+                    if (formAccTitle) formAccTitle.textContent = "Create Your Permanent Account";
+                    if (btnSubmitAccount) btnSubmitAccount.textContent = "Create Permanent Account & Play";
+                    btnToggleAccountMode.textContent = "Already have an account? Sign In";
+                } else {
+                    if (formAccTitle) formAccTitle.textContent = "Sign In to Your Account";
+                    if (btnSubmitAccount) btnSubmitAccount.textContent = "Sign In & Play";
+                    btnToggleAccountMode.textContent = "Need an account? Sign Up";
+                }
             }
         });
     }
@@ -1426,8 +1444,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 return;
             }
             try {
-                if (!isSignUpMode) {
-                    // Sign In: save account, sync UI, and close modal
+                const isSigningIn = (window.isSignUpMode === false);
+                if (isSigningIn) {
+                    // Sign In: save account, sync UI, and close modal immediately
                     localStorage.setItem("spotiless_account", JSON.stringify({ username: u, logged_in_at: Date.now() }));
                     checkAccountState();
                     showToast(`Signed in as ${u}! 🎉`);
