@@ -10,9 +10,6 @@
  */
 
 document.addEventListener("DOMContentLoaded", () => {
-    // Immediate Mouse Reactivity & Spotlight
-    initMouseReactivity();
-
     // Audio Engine
     const audio = new window.MicroAudioEngine();
 
@@ -1730,9 +1727,6 @@ document.addEventListener("DOMContentLoaded", () => {
             });
         }
 
-        // Subtle background mouse reactivity (parallax shift & soft spotlight)
-        initMouseReactivity();
-
         // Keyboard Shortcuts
         window.addEventListener("keydown", (e) => {
             // Spacebar: Play snippet (if not typing in text input)
@@ -1767,73 +1761,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function isAnyModalOpen() {
         return !!document.querySelector(".modal-overlay:not(.hidden)");
-    }
-
-    function initMouseReactivity() {
-        // Purge any stale custom cursor dot or canvas elements
-        const purgeStale = () => {
-            const staleSelectors = [
-                "#cursor-dot", ".cursor-dot",
-                "#mouse-dot", ".mouse-dot",
-                "#cursor-follower", ".cursor-follower",
-                "#custom-cursor", ".custom-cursor",
-                "#cursor-glow", ".cursor-glow",
-                ".cursor-trail", ".mouse-circle",
-                "#interactive-bg-canvas"
-            ];
-            document.querySelectorAll(staleSelectors.join(",")).forEach(el => el.remove());
-            if (document.body) document.body.style.cursor = "auto";
-            if (document.documentElement) document.documentElement.style.cursor = "auto";
-        };
-        purgeStale();
-
-        let ticking = false;
-        let mouseX = -9999;
-        let mouseY = -9999;
-
-        const updatePositions = () => {
-            const root = document.documentElement;
-            const body = document.body;
-
-            const pxX = mouseX.toFixed(1) + 'px';
-            const pxY = mouseY.toFixed(1) + 'px';
-
-            root.style.setProperty('--mouse-px-x', pxX);
-            root.style.setProperty('--mouse-px-y', pxY);
-
-            if (body) {
-                body.style.setProperty('--mouse-px-x', pxX);
-                body.style.setProperty('--mouse-px-y', pxY);
-            }
-            ticking = false;
-        };
-
-        const onMove = (e) => {
-            mouseX = e.clientX;
-            mouseY = e.clientY;
-            if (!ticking) {
-                window.requestAnimationFrame(updatePositions);
-                ticking = true;
-            }
-        };
-
-        window.addEventListener('mousemove', onMove, { passive: true });
-        window.addEventListener('pointermove', onMove, { passive: true });
-        window.addEventListener('touchmove', (e) => {
-            if (e.touches && e.touches[0]) onMove(e.touches[0]);
-        }, { passive: true });
-
-        document.addEventListener('mouseleave', () => {
-            mouseX = -9999;
-            mouseY = -9999;
-            if (!ticking) {
-                window.requestAnimationFrame(updatePositions);
-                ticking = true;
-            }
-        });
-
-        // Initial update
-        updatePositions();
     }
 
     // Launch App: register event listeners synchronously on millisecond 0

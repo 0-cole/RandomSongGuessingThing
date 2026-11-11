@@ -18,7 +18,7 @@
 
 ## 1. Executive Summary & High-Level Objective
 - **Project**: Spotiless (Songless — Spotify Edition), an endless music guessing game inspired by *Songless* (Lessgames) with microsecond-accurate snippet intervals (0.1s → 0.25s → 0.5s → 1.0s → 2.0s → 5.0s).
-- **Current Version**: `v1.3.6` (Unified GitHub Cloud & Local Native Release)
+- **Current Version**: `v1.3.7` (Unified GitHub Cloud & Local Native Release)
 - **Official Branding**: **Spoti-Less** in-app / **Spotiless** for domain and repository links.
 - **Dual Architecture**:
   1. **Desktop Native Mode (`launcher.py` / `127.0.0.1:4321`)**: 100% Native Spotify Shannon cipher streaming over TCP port 4070 (`ap-gae2.spotify.com:4070`) using cached Librespot playback tokens and personal Spotify user libraries. Works even through school firewalls and FortiGuard blocks.
@@ -44,16 +44,16 @@
   - Ubiquitous Terms of Service & Privacy Policy modal (`#modal-privacy`) accessible via top navigation shield button (`#btn-nav-privacy`) and footer.
   - Data deletion copy preserved; wipe button earmarked for upcoming Settings menu.
 
-## 3. Recent Modifications & Verified State (`v1.3.6`)
-- [`backend/app.py`](file:///d:/DOWNLOAD/RandomSongGuessingThing/backend/app.py): Bumped version to `v1.3.6`.
+## 3. Recent Modifications & Verified State (`v1.3.7`)
+- [`backend/app.py`](file:///d:/DOWNLOAD/RandomSongGuessingThing/backend/app.py): Bumped version to `v1.3.7`.
 - [`static/style.css`](file:///d:/DOWNLOAD/RandomSongGuessingThing/static/style.css):
-  - 100% restored the native floating Spotify logo pattern (`body::before`) and crowd wave (`body::after`).
-  - Added complementary inverted radial masks: the base pattern is masked out inside the 175px cursor area, while `#bg-magnifier` scales up the pattern inside that exact same 175px area.
-  - Zero overlapping duplicates (no ghost afterimages), zero canvas overhead, zero green glow, and stationary background alignment.
+  - Completely removed all mouse reactivity, masks, and magnifying overlay layers.
+  - Retained the clean, hardware-accelerated floating Spotify logo pattern (`body::before`) and traveling crowd wave (`body::after`).
+  - Background is steady, floating naturally down-right with zero afterimages, zero green halos, and zero cursor dot overlays.
 - [`static/app.js`](file:///d:/DOWNLOAD/RandomSongGuessingThing/static/app.js):
-  - Cleaned up duplicate functions; streamlined `initMouseReactivity()` to smoothly manage `--mouse-px-x` and `--mouse-px-y`.
+  - Completely removed `initMouseReactivity()` and mousemove listeners.
 - [`static/index.html`](file:///d:/DOWNLOAD/RandomSongGuessingThing/static/index.html):
-  - Added `#bg-magnifier` DOM element and bumped asset query strings to `?v=1.3.6`.
+  - Removed `#bg-magnifier` DOM node and bumped cache query strings to `?v=1.3.7`.
 
 ## 4. Immediate Next Steps
 - Full unified gameplay verified across both Local Desktop launcher and Cloud Vercel deployment.
