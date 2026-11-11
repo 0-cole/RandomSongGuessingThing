@@ -354,20 +354,19 @@ document.addEventListener("DOMContentLoaded", () => {
     drawVisualizer();
 
     // ----------------- Interactive Mouse Background System -----------------
-    // Native CSS background (body::before & body::after) stays completely stationary.
-    // #bg-magnifier slightly increases the pattern size only where your mouse is.
-    // Zero green glow or intrusive dots.
-    function initMouseMagnifier() {
-        // 1. Purge any stale canvas or custom cursor dot elements from DOM
+    // Single-layer vector pattern: logos themselves actually scale up in the area around your mouse.
+    // Zero afterimage, zero ghosting, zero green halo.
+    function initInteractiveBackground() {
+        // 1. Purge any stale overlays or custom cursor dot elements from DOM
         const purgeStale = () => {
             const staleSelectors = [
-                "#interactive-bg-canvas",
                 "#cursor-dot", ".cursor-dot",
                 "#mouse-dot", ".mouse-dot",
                 "#cursor-follower", ".cursor-follower",
                 "#custom-cursor", ".custom-cursor",
                 "#cursor-glow", ".cursor-glow",
-                ".cursor-trail", ".mouse-circle"
+                ".cursor-trail", ".mouse-circle",
+                "#bg-magnifier"
             ];
             document.querySelectorAll(staleSelectors.join(",")).forEach(el => el.remove());
             if (document.body) document.body.style.cursor = "auto";
@@ -377,44 +376,166 @@ document.addEventListener("DOMContentLoaded", () => {
         const observer = new MutationObserver(() => purgeStale());
         observer.observe(document.body || document.documentElement, { childList: true, subtree: true });
 
-        let ticking = false;
+        // 2. Setup high-performance full-screen background canvas
+        let bgCanvas = document.getElementById("interactive-bg-canvas");
+        if (!bgCanvas) {
+            bgCanvas = document.createElement("canvas");
+            bgCanvas.id = "interactive-bg-canvas";
+            bgCanvas.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100vw;
+                height: 100vh;
+                pointer-events: none;
+                z-index: 0;
+                overflow: hidden;
+            `;
+            document.body.insertBefore(bgCanvas, document.body.firstChild);
+        }
+
+        const bgCtx = bgCanvas.getContext("2d");
+        const logoPath = new Path2D("M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.48.66.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z");
+        const rad28 = 28 * Math.PI / 180;
+
         let mouseX = -9999;
         let mouseY = -9999;
-        const root = document.documentElement;
+        let targetX = -9999;
+        let targetY = -9999;
+        let isMouseActive = false;
 
-        const updatePositions = () => {
-            root.style.setProperty("--mouse-px-x", `${mouseX.toFixed(1)}px`);
-            root.style.setProperty("--mouse-px-y", `${mouseY.toFixed(1)}px`);
-            ticking = false;
-        };
-
-        const onMove = (e) => {
-            mouseX = e.clientX;
-            mouseY = e.clientY;
-            if (!ticking) {
-                window.requestAnimationFrame(updatePositions);
-                ticking = true;
+        const onMove = (clientX, clientY) => {
+            targetX = clientX;
+            targetY = clientY;
+            if (!isMouseActive) {
+                mouseX = clientX;
+                mouseY = clientY;
             }
+            isMouseActive = true;
         };
 
-        window.addEventListener("mousemove", onMove, { passive: true });
-        window.addEventListener("pointermove", onMove, { passive: true });
+        window.addEventListener("mousemove", (e) => onMove(e.clientX, e.clientY), { passive: true });
+        window.addEventListener("pointermove", (e) => onMove(e.clientX, e.clientY), { passive: true });
         window.addEventListener("touchmove", (e) => {
-            if (e.touches && e.touches[0]) onMove(e.touches[0]);
+            if (e.touches && e.touches[0]) onMove(e.touches[0].clientX, e.touches[0].clientY);
         }, { passive: true });
 
         document.addEventListener("mouseleave", () => {
-            mouseX = -9999;
-            mouseY = -9999;
-            if (!ticking) {
-                window.requestAnimationFrame(updatePositions);
-                ticking = true;
-            }
+            isMouseActive = false;
+            targetX = -9999;
+            targetY = -9999;
         });
+
+        const tileSize = 64;
+        const interactionRadius = 180;
+
+        function render(time) {
+            requestAnimationFrame(render);
+
+            const w = window.innerWidth;
+            const h = window.innerHeight;
+            const dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+            if (bgCanvas.width !== Math.round(w * dpr) || bgCanvas.height !== Math.round(h * dpr)) {
+                bgCanvas.width = Math.round(w * dpr);
+                bgCanvas.height = Math.round(h * dpr);
+            }
+            bgCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            bgCtx.clearRect(0, 0, w, h);
+
+            if (isMouseActive) {
+                mouseX += (targetX - mouseX) * 0.22;
+                mouseY += (targetY - mouseY) * 0.22;
+            }
+
+            const isDark = !document.body.classList.contains("light-theme");
+            const baseAlpha = isDark ? 0.08 : 0.055;
+            const wavePos = (time * 0.00016) % 1.0;
+            const drift = (time * (tileSize / 22000)) % tileSize;
+
+            bgCtx.fillStyle = "#1db954";
+
+            const cols = Math.ceil(w / tileSize) + 2;
+            const rows = Math.ceil(h / tileSize) + 2;
+
+            for (let r = -1; r < rows; r++) {
+                for (let c = -1; c < cols; c++) {
+                    const cellX = c * tileSize + drift;
+                    const cellY = r * tileSize + drift;
+
+                    // Traveling Crowd Wave subtle highlight
+                    const diag = ((cellX + cellY) / (w + h + 200) + 1.0) % 1.0;
+                    const waveDist = Math.abs(diag - wavePos);
+                    const waveBoost = waveDist < 0.1 ? (1 - waveDist / 0.1) * 0.12 : 0;
+                    bgCtx.globalAlpha = baseAlpha + waveBoost;
+
+                    // 1. Primary Spotify logo #1 at relative (16, 16)
+                    const l1x = cellX + 16;
+                    const l1y = cellY + 16;
+                    let s1 = 1.0;
+                    if (isMouseActive) {
+                        const d = Math.hypot(l1x - mouseX, l1y - mouseY);
+                        if (d < interactionRadius) {
+                            s1 = 1.0 + Math.cos((d / interactionRadius) * (Math.PI / 2)) * 0.70;
+                        }
+                    }
+                    bgCtx.save();
+                    bgCtx.translate(l1x, l1y);
+                    bgCtx.scale(s1 * 0.9, s1 * 0.9);
+                    bgCtx.rotate(rad28);
+                    bgCtx.translate(-12, -12);
+                    bgCtx.fill(logoPath);
+                    bgCtx.restore();
+
+                    // 2. Primary Spotify logo #2 at relative (48, 48)
+                    const l2x = cellX + 48;
+                    const l2y = cellY + 48;
+                    let s2 = 1.0;
+                    if (isMouseActive) {
+                        const d = Math.hypot(l2x - mouseX, l2y - mouseY);
+                        if (d < interactionRadius) {
+                            s2 = 1.0 + Math.cos((d / interactionRadius) * (Math.PI / 2)) * 0.70;
+                        }
+                    }
+                    bgCtx.save();
+                    bgCtx.translate(l2x, l2y);
+                    bgCtx.scale(s2 * 0.9, s2 * 0.9);
+                    bgCtx.rotate(rad28);
+                    bgCtx.translate(-12, -12);
+                    bgCtx.fill(logoPath);
+                    bgCtx.restore();
+
+                    // 3. Ambient dots/bubbles (scaled smoothly along with logos)
+                    const dots = [
+                        { x: cellX + 48, y: cellY + 16, r: 3.2, op: 0.7 },
+                        { x: cellX + 16, y: cellY + 48, r: 2.5, op: 0.7 },
+                        { x: cellX + 32, y: cellY + 2,  r: 1.5, op: 0.5 },
+                        { x: cellX + 2,  y: cellY + 32, r: 1.5, op: 0.5 }
+                    ];
+
+                    for (let i = 0; i < dots.length; i++) {
+                        const dot = dots[i];
+                        let sd = 1.0;
+                        if (isMouseActive) {
+                            const d = Math.hypot(dot.x - mouseX, dot.y - mouseY);
+                            if (d < interactionRadius) {
+                                sd = 1.0 + Math.cos((d / interactionRadius) * (Math.PI / 2)) * 0.60;
+                            }
+                        }
+                        bgCtx.globalAlpha = (baseAlpha + waveBoost) * dot.op;
+                        bgCtx.beginPath();
+                        bgCtx.arc(dot.x, dot.y, dot.r * sd, 0, Math.PI * 2);
+                        bgCtx.fill();
+                    }
+                }
+            }
+        }
+
+        render(0);
     }
 
-    // Initialize local mouse background magnifier immediately
-    initMouseMagnifier();
+    // Initialize single-layer interactive background immediately
+    initInteractiveBackground();
 
     // ----------------- Initialization -----------------
     // ----------------- Theme Management -----------------
