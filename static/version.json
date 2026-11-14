@@ -1,6 +1,6 @@
 {
-  "version": "v1.4.6",
+  "version": "v1.4.7",
   "name": "Spoti-Less",
-  "updated_at": "2026-11-14T03:05:00Z",
-  "changelog": "Gentle update notification and active round & streak persistence on reload."
+  "updated_at": "2026-11-14T08:13:00Z",
+  "changelog": "Universal multi-user Spotify discovery, additive playlist merging, gentle update notification, and active round persistence."
 }

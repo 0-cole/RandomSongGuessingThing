@@ -11,7 +11,7 @@
 
 document.addEventListener("DOMContentLoaded", () => {
     // Current App Version & Audio Engine
-    const CURRENT_APP_VERSION = "v1.4.6";
+    const CURRENT_APP_VERSION = "v1.4.7";
     window.__CURRENT_APP_VERSION__ = CURRENT_APP_VERSION;
     const audio = new window.MicroAudioEngine();
 
@@ -390,7 +390,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         const mergedPlaylists = Array.from(mergedMap.values());
                         try {
                             localStorage.setItem("spotiless_public_playlists", JSON.stringify(mergedPlaylists));
-                            localStorage.setItem("spotiless_playlists_schema", "v1.4.6");
+                            localStorage.setItem("spotiless_playlists_schema", "v1.4.7");
                         } catch (e) {}
                         cachedUserPlaylists = mergedPlaylists;
                     }
@@ -672,7 +672,7 @@ document.addEventListener("DOMContentLoaded", () => {
         } catch (e) {}
 
         if (!linkedUser) return false;
-        if (!force && schema === "v1.4.6") return false;
+        if (!force && schema === "v1.4.7") return false;
         if (refreshPlaylistsInFlight) return refreshPlaylistsInFlight;
 
         refreshPlaylistsInFlight = (async () => {
@@ -695,7 +695,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 data.playlists = mergedPlaylists;
                 try {
                     localStorage.setItem("spotiless_public_playlists", JSON.stringify(mergedPlaylists));
-                    localStorage.setItem("spotiless_playlists_schema", "v1.4.6");
+                    localStorage.setItem("spotiless_playlists_schema", "v1.4.7");
                     if (Array.isArray(data.tracks) && data.tracks.length && localStorage.getItem("spotiless_custom_cloud_tracks")) {
                         const curPoolName = localStorage.getItem("spotiless_custom_pool_name") || "";
                         if (!curPoolName || curPoolName.includes("Public Playlists")) {

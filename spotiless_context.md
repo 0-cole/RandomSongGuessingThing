@@ -18,7 +18,7 @@
 
 ## 1. Executive Summary & High-Level Objective
 - **Project**: Spotiless (Songless — Spotify Edition), an endless music guessing game inspired by *Songless* (Lessgames) with microsecond-accurate snippet intervals (0.1s → 0.25s → 0.5s → 1.0s → 2.0s → 5.0s).
-- **Current Version**: `v1.4.6` (Gentle Website Update Notification, Active Round & Streak Persistence on Reload)
+- **Current Version**: `v1.4.7` (Universal Multi-User Spotify Discovery, Additive Playlist Merging, Gentle Website Update Notification, Active Round & Streak Persistence)
 - **Official Branding**: **Spoti-Less** in-app / **Spotiless** for domain and repository links.
 - **Dual Architecture**:
   1. **Desktop Native Mode (`launcher.py` / `127.0.0.1:4321`)**: 100% Native Spotify Shannon cipher streaming over TCP port 4070 (`ap-gae2.spotify.com:4070`) using cached Librespot playback tokens and personal Spotify user libraries. Works even through school firewalls and FortiGuard blocks.
@@ -48,7 +48,7 @@
   - Ubiquitous Terms of Service & Privacy Policy modal (`#modal-privacy`) accessible via top navigation shield button (`#btn-nav-privacy`) and footer.
   - Data deletion copy preserved; wipe button earmarked for upcoming Settings menu.
 
-## 3. Recent Modifications & Verified State (`v1.4.6`)
+## 3. Recent Modifications & Verified State (`v1.4.7` / `v1.4.6`)
 - **Gentle Website Update Notification ([static/index.html](file:///d:/DOWNLOAD/RandomSongGuessingThing/static/index.html), [static/style.css](file:///d:/DOWNLOAD/RandomSongGuessingThing/static/style.css), [static/app.js](file:///d:/DOWNLOAD/RandomSongGuessingThing/static/app.js), [static/version.json](file:///d:/DOWNLOAD/RandomSongGuessingThing/static/version.json))**:
   - Added non-intrusive bottom-right floating update banner with glowing pulse dot and smooth entrance animation.
   - Optimized for mobile viewports (`bottom: 16px; margin: 0 auto; max-width: none;`).
@@ -62,8 +62,9 @@
   - Added Spotify **Pathfinder GraphQL** (`fetchPlaylist`, `searchUsers`, `searchPlaylists`) using anonymous embed tokens for universal handle/display-name lookup and playlist-link-to-creator auto-discovery (`loadPlaylistAndCreator`), plus dynamic filtering of third-party Spotify radio mixes (`owner_name === "Spotify"` unless requesting `spotify`).
   - Upgraded `backend/spotify_manager.py` to resolve arbitrary desktop logged-in profiles dynamically and query `spclient.wg.spotify.com/user-profile-view/v3/profile/` with `playlist_limit=50`.
 - **Additive Playlist Merging ([static/app.js](file:///d:/DOWNLOAD/RandomSongGuessingThing/static/app.js), [static/login.html](file:///d:/DOWNLOAD/RandomSongGuessingThing/static/login.html), [static/index.html](file:///d:/DOWNLOAD/RandomSongGuessingThing/static/index.html))**:
-  - Pasting an extra public playlist link or refreshing a linked profile merges playlists additively into `localStorage` (`spotiless_public_playlists`, schema `v1.4.6`) and saves discovered creator `user_id` into `spotiless_linked_user`.
-- Bumped version and asset cache busters (`?v=1.4.6`) across frontend and backend.
+  - Pasting an extra public playlist link or refreshing a linked profile merges playlists additively into `localStorage` (`spotiless_public_playlists`, schema `v1.4.7`) and saves discovered creator `user_id` into `spotiless_linked_user`.
+- **`v1.4.7` Unified Release Version Bump ([version.json](file:///d:/DOWNLOAD/RandomSongGuessingThing/version.json), [static/version.json](file:///d:/DOWNLOAD/RandomSongGuessingThing/static/version.json))**:
+  - Unified the concurrent `v1.4.6` gentle update notifier + active round persistence with universal multi-user Spotify discovery and bumped `version.json`, `static/version.json`, `backend/app.py`, and asset cache busters (`?v=1.4.7`) so open `v1.4.6` tabs automatically detect the update banner prompt.
 
 ## 3b. Prior Verified State (`v1.4.5`)
 - **Username/Email Privacy Cleanup ([static/login.html](file:///d:/DOWNLOAD/RandomSongGuessingThing/static/login.html), [api/spotify_public.js](file:///d:/DOWNLOAD/RandomSongGuessingThing/api/spotify_public.js), [backend/app.py](file:///d:/DOWNLOAD/RandomSongGuessingThing/backend/app.py))**: Removed all hardcoded plaintext usernames and emails from HTML placeholders and server code; replaced internal alias lookup with SHA-256 hash matching.
