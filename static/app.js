@@ -68,20 +68,51 @@ document.addEventListener("DOMContentLoaded", () => {
     const btnNextSong = document.getElementById("btn-next-song");
 
     // Auth Modal elements
-    const btnStartZeroconf = document.getElementById("btn-start-zeroconf");
-    const zcBtnText = document.getElementById("zc-btn-text");
-    const zcStatusText = document.getElementById("zc-status-text");
-    const formUserPass = document.getElementById("form-user-pass");
-    const authUsername = document.getElementById("auth-username");
-    const authPassword = document.getElementById("auth-password");
-    const upStatusText = document.getElementById("up-status-text");
     const authConnectedView = document.getElementById("auth-connected-view");
+    const authUnconnectedView = document.getElementById("auth-unconnected-view");
     const userNameDisplay = document.getElementById("user-name-display");
     const userAvatar = document.getElementById("user-avatar");
     const btnLogout = document.getElementById("btn-logout");
 
-    // Unified Account & Spotify Link Controller (v1.4.1)
+    function escapeHtml(str) {
+        return String(str || "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#39;");
+    }
+    window.escapeHtml = escapeHtml;
+
+    // Unified Account & Spotify Link Controller (v1.4.2)
     let currentAuthMode = "signup"; // "signup" | "signin"
+    let isHandlingAccountSubmit = false;
+
+    function getStoredAccount() {
+        try {
+            const raw = localStorage.getItem("spotiless_account");
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                if (parsed && (parsed.username || parsed.email || parsed.raw_input)) {
+                    return parsed;
+                }
+            }
+        } catch (e) {}
+        const fallbackName = localStorage.getItem("spotiless_account_name") || localStorage.getItem("spotiless_username");
+        const fallbackEmail = localStorage.getItem("spotiless_account_email") || "";
+        if (fallbackName) {
+            return {
+                username: fallbackName.includes("@") ? fallbackName.split("@")[0].trim() : fallbackName,
+                email: fallbackEmail || (fallbackName.includes("@") ? fallbackName : ""),
+                raw_input: fallbackName
+            };
+        }
+        return null;
+    }
+
+    function getSpotifyCookie() {
+        return localStorage.getItem("spotiless_sp_dc") || localStorage.getItem("sp_dc") || "";
+    }
 
     window.setAccountMode = function(mode) {
         currentAuthMode = (mode === "signin") ? "signin" : "signup";
@@ -91,7 +122,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const tabSignin = document.getElementById("tab-mode-signin");
         const formTitle = document.getElementById("form-acc-title") || document.getElementById("auth-form-title");
         const formDesc = document.getElementById("form-acc-desc") || document.getElementById("auth-form-subtitle");
-        const btnSubmit = document.getElementById("btn-submit-account") || document.getElementById("btn-auth-submit");
+        const btnSubmitAcc = document.getElementById("btn-submit-account") || document.getElementById("btn-auth-submit");
         const toggleLink = document.getElementById("btn-toggle-account-mode");
         const userInput = document.getElementById("acc-username-input") || document.getElementById("auth-username");
         const passInput = document.getElementById("acc-password-input") || document.getElementById("auth-password");
@@ -117,21 +148,22 @@ document.addEventListener("DOMContentLoaded", () => {
         if (currentAuthMode === "signin") {
             if (formTitle) formTitle.textContent = "Sign In to Your Account";
             if (formDesc) formDesc.textContent = "Sign in with your username or email to restore your session and playlists on this device.";
-            if (btnSubmit) btnSubmit.textContent = "Sign In & Play";
+            if (btnSubmitAcc) btnSubmitAcc.textContent = "Sign In & Play";
             if (toggleLink) toggleLink.textContent = "Need an account? Create Account";
             if (userInput) {
                 userInput.placeholder = "Enter your username or email";
-                const stored = localStorage.getItem("spotiless_account_name") || localStorage.getItem("spotiless_username");
+                const acc = getStoredAccount();
+                const stored = (acc && (acc.raw_input || acc.email || acc.username)) || "";
                 if (stored && !userInput.value) userInput.value = stored;
             }
-            if (passInput) passInput.placeholder = "Enter your password";
+            if (passInput) passInput.placeholder = "Enter your password (optional)";
         } else {
             if (formTitle) formTitle.textContent = "Create Your Permanent Account";
             if (formDesc) formDesc.textContent = "Permanently links your Spotify session, streaks, and custom playlists on this device.";
-            if (btnSubmit) btnSubmit.textContent = "Create Permanent Account & Play";
+            if (btnSubmitAcc) btnSubmitAcc.textContent = "Create Permanent Account & Play";
             if (toggleLink) toggleLink.textContent = "Already have an account? Sign In";
             if (userInput) userInput.placeholder = "Choose a username or email";
-            if (passInput) passInput.placeholder = "Choose a password";
+            if (passInput) passInput.placeholder = "Choose a password (optional)";
         }
     };
 
@@ -140,167 +172,248 @@ document.addEventListener("DOMContentLoaded", () => {
         window.setAccountMode(currentAuthMode === "signup" ? "signin" : "signup");
     };
 
+    function scrollAuthModalToTop() {
+        if (!modalAuth) return;
+        modalAuth.scrollTop = 0;
+        const card = modalAuth.querySelector(".modal-card");
+        if (card) card.scrollTop = 0;
+    }
+
+    window.openAuthModal = function() {
+        if (!modalAuth) return;
+        modalAuth.classList.remove("hidden");
+        checkAccountState();
+        scrollAuthModalToTop();
+    };
+
+    window.closeAuthModalAndPlay = function() {
+        closeModals();
+        if (audio && typeof audio.ensureContextRunning === "function") {
+            audio.ensureContextRunning().catch(() => {});
+        }
+    };
+
     function renderAccountConnectedView(accountName, isSpotifyLinked) {
         const unconnectedView = document.getElementById("auth-unconnected-view");
         const connectedView = document.getElementById("auth-connected-view");
 
         if (unconnectedView) {
             unconnectedView.classList.add("hidden");
-            unconnectedView.style.display = "none";
+            unconnectedView.style.setProperty("display", "none", "important");
         }
         if (connectedView) {
             connectedView.classList.remove("hidden");
-            connectedView.style.display = "block";
+            connectedView.style.setProperty("display", "block", "important");
         }
 
+        const displayName = accountName || "Player";
         const nameEl = document.getElementById("user-name-display");
-        if (nameEl) {
-            nameEl.textContent = accountName || "Player";
-        }
+        if (nameEl) nameEl.textContent = displayName;
 
+        const userTierBadge = document.getElementById("user-tier-badge");
         const spotifyPill = document.getElementById("spotify-link-pill");
         const unlinkedBox = document.getElementById("box-spotify-unlinked");
         const linkedBox = document.getElementById("box-spotify-linked");
-        const spotifyBox = document.getElementById("account-spotify-link-box");
         const welcomeBanner = document.getElementById("account-welcome-banner");
+        const linkedPlaylist = localStorage.getItem("spotiless_linked_playlist");
 
         if (isSpotifyLinked) {
+            if (userTierBadge) {
+                userTierBadge.textContent = "Spotify Linked 🍪";
+                userTierBadge.style.background = "var(--color-spotify)";
+                userTierBadge.style.color = "#000";
+            }
             if (spotifyPill) {
-                spotifyPill.textContent = "Spotify Linked";
+                spotifyPill.textContent = "✓ Connected";
                 spotifyPill.style.background = "rgba(29, 185, 84, 0.2)";
                 spotifyPill.style.color = "#1ed760";
             }
-            if (unlinkedBox) unlinkedBox.classList.add("hidden");
-            if (linkedBox) linkedBox.classList.remove("hidden");
+            if (unlinkedBox) {
+                unlinkedBox.classList.add("hidden");
+                unlinkedBox.style.setProperty("display", "none", "important");
+            }
+            if (linkedBox) {
+                linkedBox.classList.remove("hidden");
+                linkedBox.style.setProperty("display", "flex", "important");
+            }
             if (welcomeBanner) {
                 welcomeBanner.classList.remove("hidden");
                 welcomeBanner.style.background = "rgba(29, 185, 84, 0.15)";
                 welcomeBanner.style.border = "1px solid #1db954";
                 welcomeBanner.style.color = "#1ed760";
-                welcomeBanner.innerHTML = `<strong>Signed in as ${escapeHtml(accountName)}</strong><br><span style="color:#d0d0d0; font-size:12px;">✅ Spotify account is linked and ready.</span>`;
+                welcomeBanner.innerHTML = `<strong>Signed in as ${escapeHtml(displayName)}</strong><br><span style="color:#d0d0d0; font-size:12px;">✅ Spotify account is linked and ready.</span>`;
             }
         } else {
-            if (spotifyPill) {
-                spotifyPill.textContent = "Not Linked";
-                spotifyPill.style.background = "rgba(255, 107, 107, 0.2)";
-                spotifyPill.style.color = "#ff6b6b";
+            if (userTierBadge) {
+                userTierBadge.textContent = linkedPlaylist ? "Playlist Saved 🎵" : "Signed In";
+                userTierBadge.style.background = linkedPlaylist ? "rgba(29, 185, 84, 0.2)" : "rgba(255, 255, 255, 0.15)";
+                userTierBadge.style.color = linkedPlaylist ? "#1ed760" : "#ddd";
             }
-            if (unlinkedBox) unlinkedBox.classList.remove("hidden");
-            if (linkedBox) linkedBox.classList.add("hidden");
+            if (spotifyPill) {
+                spotifyPill.textContent = linkedPlaylist ? "Playlist Linked" : "Not Linked";
+                spotifyPill.style.background = linkedPlaylist ? "rgba(29, 185, 84, 0.2)" : "rgba(255, 107, 107, 0.2)";
+                spotifyPill.style.color = linkedPlaylist ? "#1ed760" : "#ff6b6b";
+            }
+            if (unlinkedBox) {
+                unlinkedBox.classList.remove("hidden");
+                unlinkedBox.style.setProperty("display", "block", "important");
+            }
+            if (linkedBox) {
+                linkedBox.classList.add("hidden");
+                linkedBox.style.setProperty("display", "none", "important");
+            }
             if (welcomeBanner) {
                 welcomeBanner.classList.remove("hidden");
-                welcomeBanner.style.background = "rgba(255, 170, 0, 0.12)";
-                welcomeBanner.style.border = "1px solid rgba(255, 170, 0, 0.35)";
-                welcomeBanner.style.color = "#ffb84d";
-                welcomeBanner.innerHTML = `<strong>Signed in as ${escapeHtml(accountName)}</strong><br><span style="color:#d0d0d0; font-size:12px;">Link your Spotify below to guess from your own library, or play free right away:</span>`;
+                welcomeBanner.style.background = "rgba(29, 185, 84, 0.12)";
+                welcomeBanner.style.border = "1px solid rgba(29, 185, 84, 0.45)";
+                welcomeBanner.style.color = "#1ed760";
+                welcomeBanner.innerHTML = `<strong>Signed in as ${escapeHtml(displayName)}</strong><br><span style="color:#d0d0d0; font-size:12px;">Tap <strong>Start Playing Now</strong> below, or link a Spotify playlist link / cookie.</span>`;
             }
         }
 
-        // Update nav status dot & label
         if (authStatusDot) {
-            authStatusDot.className = isSpotifyLinked ? "status-dot connected" : "status-dot guest";
+            authStatusDot.className = "dot-connected";
         }
         if (authUsernameLabel) {
-            authUsernameLabel.textContent = isSpotifyLinked ? "• Spotify" : (accountName ? accountName.split("@")[0] : "Connect Spotify");
+            authUsernameLabel.textContent = displayName.includes("@") ? displayName.split("@")[0] : displayName;
         }
     }
+    window.renderAccountConnectedView = renderAccountConnectedView;
 
-    function checkStoredAccount() {
-        const storedAccount = localStorage.getItem("spotiless_account_name") || localStorage.getItem("spotiless_username");
-        const hasSpDc = !!(localStorage.getItem("spotiless_sp_dc") || localStorage.getItem("sp_dc"));
-        if (storedAccount) {
-            renderAccountConnectedView(storedAccount, hasSpDc);
-            return true;
-        } else {
-            const unconnectedView = document.getElementById("auth-unconnected-view");
-            const connectedView = document.getElementById("auth-connected-view");
-            if (unconnectedView) {
-                unconnectedView.classList.remove("hidden");
-                unconnectedView.style.display = "block";
-            }
-            if (connectedView) {
-                connectedView.classList.add("hidden");
-                connectedView.style.display = "none";
-            }
+    window.handleAccountSubmit = function(e) {
+        if (e) {
+            if (typeof e.preventDefault === "function") e.preventDefault();
+            if (typeof e.stopPropagation === "function") e.stopPropagation();
         }
+        if (isHandlingAccountSubmit) return false;
+        isHandlingAccountSubmit = true;
+        setTimeout(() => { isHandlingAccountSubmit = false; }, 150);
+
+        const userInput = document.getElementById("acc-username-input") || document.getElementById("auth-username");
+        const passInput = document.getElementById("acc-password-input") || document.getElementById("auth-password");
+        const rawVal = (userInput ? userInput.value : "").trim();
+        const passVal = (passInput ? passInput.value : "").trim();
+
+        if (!rawVal) {
+            showToast("Please enter a username or email to sign in.");
+            if (userInput) userInput.focus();
+            return false;
+        }
+
+        try {
+            let displayName = rawVal;
+            let emailStr = "";
+            if (rawVal.includes("@")) {
+                emailStr = rawVal;
+                displayName = rawVal.split("@")[0].trim() || rawVal;
+            }
+
+            const existingAcc = getStoredAccount() || {};
+            const acc = {
+                ...existingAcc,
+                username: displayName,
+                email: emailStr || existingAcc.email || "",
+                raw_input: rawVal,
+                logged_in_at: Date.now()
+            };
+            localStorage.setItem("spotiless_account", JSON.stringify(acc));
+            localStorage.setItem("spotiless_account_name", rawVal);
+            localStorage.setItem("spotiless_username", displayName);
+            if (emailStr) localStorage.setItem("spotiless_account_email", emailStr);
+            if (passVal) localStorage.setItem("spotiless_account_has_pass", "1");
+
+            const hasSpDc = !!getSpotifyCookie();
+            renderAccountConnectedView(displayName, hasSpDc);
+            checkAccountState();
+            scrollAuthModalToTop();
+
+            const actionVerb = currentAuthMode === "signin" ? "Signed in" : "Account created";
+            showToast(`${actionVerb} as ${displayName}! 🎉`);
+        } catch (err) {
+            console.error("Account submit error:", err);
+            showToast("Could not save account on this browser.");
+        }
+
         return false;
+    };
+
+    async function handleSpotifyLinkInput(rawInput, inputEl) {
+        const raw = (rawInput || "").trim();
+        if (!raw) {
+            showToast("Paste a Spotify playlist link or your sp_dc cookie.");
+            if (inputEl) inputEl.focus();
+            return;
+        }
+
+        // Support Spotify Playlist URL or URI on both Mobile and PC
+        const playlistMatch = raw.match(/(?:open\.spotify\.com\/playlist\/|spotify:playlist:)([a-zA-Z0-9]+)/i);
+        if (playlistMatch) {
+            const playlistId = playlistMatch[1];
+            localStorage.setItem("spotiless_linked_playlist", playlistId);
+            if (inputEl) inputEl.value = "";
+
+            if (!isCloudMode) {
+                try {
+                    const res = await fetch("/api/playlists/load_custom", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ url_or_id: raw })
+                    });
+                    const data = await res.json();
+                    if (data && data.success) {
+                        closeModals();
+                        applyGameState(data.round);
+                        refreshStatus();
+                        showToast("Loaded Spotify playlist! 🎵");
+                        return;
+                    }
+                } catch (err) {
+                    console.warn("Local playlist load failed:", err);
+                }
+            }
+
+            checkAccountState();
+            showToast("Spotify playlist saved! Tap Start Playing Now to play Cloud Top Hits.");
+            return;
+        }
+
+        // Otherwise treat as sp_dc cookie
+        const match = raw.match(/sp_dc=([a-zA-Z0-9_\-]+)/);
+        const cookieVal = match ? match[1] : raw;
+        localStorage.setItem("spotiless_sp_dc", cookieVal);
+        localStorage.setItem("sp_dc", cookieVal);
+        if (inputEl) inputEl.value = "";
+
+        const acc = getStoredAccount();
+        const currentName = (acc && acc.username) || "Spotify User";
+        renderAccountConnectedView(currentName, true);
+        checkAccountState();
+        showToast("Spotify linked successfully! 🍪");
     }
 
     // Initialize Auth Form Submissions & Event Listeners
     function initUnifiedAuthHandlers() {
-        // Tab switcher buttons
-        const tabSignup = document.getElementById("tab-mode-signup");
-        const tabSignin = document.getElementById("tab-mode-signin");
-        const toggleLink = document.getElementById("btn-toggle-account-mode");
-
-        if (tabSignup) {
-            tabSignup.addEventListener("click", (e) => { e.preventDefault(); window.setAccountMode("signup"); });
-            tabSignup.addEventListener("touchend", (e) => { e.preventDefault(); window.setAccountMode("signup"); });
-        }
-        if (tabSignin) {
-            tabSignin.addEventListener("click", (e) => { e.preventDefault(); window.setAccountMode("signin"); });
-            tabSignin.addEventListener("touchend", (e) => { e.preventDefault(); window.setAccountMode("signin"); });
-        }
-        if (toggleLink) {
-            toggleLink.addEventListener("click", (e) => { e.preventDefault(); window.toggleAccountAuthMode(e); });
-        }
-
-        // Form submit handler - INTERCEPT DEFAULT SUBMIT TO PREVENT GHOST RELOAD
         const formLocalAccount = document.getElementById("form-local-account");
-        const handleAccountSubmit = (e) => {
-            if (e) {
-                e.preventDefault();
-                e.stopPropagation();
-            }
-
-            const userInput = document.getElementById("acc-username-input") || document.getElementById("auth-username");
-            const passInput = document.getElementById("acc-password-input") || document.getElementById("auth-password");
-            const rawVal = (userInput ? userInput.value : "").trim();
-            const passVal = (passInput ? passInput.value : "").trim();
-
-            if (!rawVal) {
-                alert("Please enter a username or email address.");
-                if (userInput) userInput.focus();
-                return false;
-            }
-
-            // Save user info in localStorage
-            localStorage.setItem("spotiless_account_name", rawVal);
-            if (rawVal.includes("@")) {
-                localStorage.setItem("spotiless_account_email", rawVal);
-                localStorage.setItem("spotiless_username", rawVal.split("@")[0]);
-            } else {
-                localStorage.setItem("spotiless_username", rawVal);
-            }
-            if (passVal) {
-                localStorage.setItem("spotiless_account_has_pass", "1");
-            }
-
-            const hasSpDc = !!(localStorage.getItem("spotiless_sp_dc") || localStorage.getItem("sp_dc"));
-
-            // KEEP MODAL OPEN! Transition seamlessly to connected view
-            renderAccountConnectedView(rawVal, hasSpDc);
-
-            // Focus on Spotify cookie input if unlinked
-            if (!hasSpDc) {
-                const cookieInput = document.getElementById("input-connected-cookie-spdc") || document.getElementById("input-cookie-spdc");
-                if (cookieInput) {
-                    setTimeout(() => cookieInput.focus(), 100);
-                }
-            }
-
-            return false;
-        };
-
         if (formLocalAccount) {
-            formLocalAccount.onsubmit = handleAccountSubmit;
-            formLocalAccount.addEventListener("submit", handleAccountSubmit);
+            formLocalAccount.onsubmit = window.handleAccountSubmit;
         }
 
         const btnSubmitAccount = document.getElementById("btn-submit-account");
         if (btnSubmitAccount) {
-            btnSubmitAccount.addEventListener("click", handleAccountSubmit);
+            btnSubmitAccount.addEventListener("click", window.handleAccountSubmit);
         }
+
+        // Tab switcher inside modal (Permanent Account vs Cookie / Guest)
+        const tabBtns = document.querySelectorAll(".auth-tabs .tab-btn");
+        tabBtns.forEach(btn => {
+            btn.addEventListener("click", () => {
+                tabBtns.forEach(b => b.classList.remove("active"));
+                document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
+                btn.classList.add("active");
+                const target = document.getElementById(btn.dataset.tab);
+                if (target) target.classList.add("active");
+            });
+        });
 
         // Edit / Reset Username handlers
         const boxEditUsername = document.getElementById("box-edit-username");
@@ -315,10 +428,12 @@ document.addEventListener("DOMContentLoaded", () => {
             if (boxEditUsername) {
                 boxEditUsername.classList.remove("hidden");
                 boxEditUsername.style.display = "block";
-                const current = localStorage.getItem("spotiless_username") || localStorage.getItem("spotiless_account_name") || "";
+                const acc = getStoredAccount();
+                const current = (acc && acc.username) || "";
                 if (inputNewUsername) {
-                    inputNewUsername.value = current.includes("@") ? current.split("@")[0] : current;
+                    inputNewUsername.value = current;
                     inputNewUsername.focus();
+                    inputNewUsername.select();
                 }
             }
         };
@@ -336,42 +451,50 @@ document.addEventListener("DOMContentLoaded", () => {
             });
         }
 
-        if (btnSaveNewUsername) {
-            btnSaveNewUsername.addEventListener("click", (e) => {
-                if (e) e.preventDefault();
-                const newName = (inputNewUsername ? inputNewUsername.value : "").trim();
-                if (newName) {
-                    localStorage.setItem("spotiless_username", newName);
-                    localStorage.setItem("spotiless_account_name", newName);
-                    const hasSpDc = !!(localStorage.getItem("spotiless_sp_dc") || localStorage.getItem("sp_dc"));
-                    renderAccountConnectedView(newName, hasSpDc);
-                }
-                if (boxEditUsername) {
-                    boxEditUsername.classList.add("hidden");
-                    boxEditUsername.style.display = "none";
-                }
+        const saveNewUsername = (e) => {
+            if (e) e.preventDefault();
+            const newName = (inputNewUsername ? inputNewUsername.value : "").trim();
+            if (!newName) {
+                showToast("Please enter a username.");
+                return;
+            }
+            const acc = getStoredAccount() || {};
+            acc.username = newName;
+            localStorage.setItem("spotiless_account", JSON.stringify(acc));
+            localStorage.setItem("spotiless_username", newName);
+            localStorage.setItem("spotiless_account_name", newName);
+            renderAccountConnectedView(newName, !!getSpotifyCookie());
+            if (boxEditUsername) {
+                boxEditUsername.classList.add("hidden");
+                boxEditUsername.style.display = "none";
+            }
+            showToast(`Username updated to ${newName}! ✨`);
+        };
+
+        if (btnSaveNewUsername) btnSaveNewUsername.addEventListener("click", saveNewUsername);
+        if (inputNewUsername) {
+            inputNewUsername.addEventListener("keydown", (e) => {
+                if (e.key === "Enter") saveNewUsername(e);
             });
         }
 
-        // Spotify Cookie link inside Connected View
+        // Spotify Link inside Connected View
         const btnSaveConnectedCookie = document.getElementById("btn-save-connected-cookie");
         const inputConnectedCookie = document.getElementById("input-connected-cookie-spdc");
         if (btnSaveConnectedCookie) {
             btnSaveConnectedCookie.addEventListener("click", (e) => {
                 if (e) e.preventDefault();
-                const raw = (inputConnectedCookie ? inputConnectedCookie.value : "").trim();
-                if (!raw) {
-                    alert("Please paste your sp_dc cookie from open.spotify.com.");
-                    return;
-                }
-                const match = raw.match(/sp_dc=([a-zA-Z0-9_\-]+)/);
-                const cookieVal = match ? match[1] : raw;
-                localStorage.setItem("spotiless_sp_dc", cookieVal);
-                localStorage.setItem("sp_dc", cookieVal);
+                handleSpotifyLinkInput(inputConnectedCookie ? inputConnectedCookie.value : "", inputConnectedCookie);
+            });
+        }
 
-                const currentName = localStorage.getItem("spotiless_account_name") || localStorage.getItem("spotiless_username") || "Spotify User";
-                renderAccountConnectedView(currentName, true);
-                if (modalAuth) modalAuth.classList.add("hidden");
+        // Cookie tab link button
+        const btnSaveCookie = document.getElementById("btn-save-cookie");
+        const inputCookieSpdc = document.getElementById("input-cookie-spdc");
+        if (btnSaveCookie) {
+            btnSaveCookie.addEventListener("click", (e) => {
+                if (e) e.preventDefault();
+                handleSpotifyLinkInput(inputCookieSpdc ? inputCookieSpdc.value : "", inputCookieSpdc);
             });
         }
 
@@ -382,37 +505,38 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (e) e.preventDefault();
                 localStorage.removeItem("spotiless_sp_dc");
                 localStorage.removeItem("sp_dc");
-                const currentName = localStorage.getItem("spotiless_account_name") || localStorage.getItem("spotiless_username") || "Player";
-                renderAccountConnectedView(currentName, false);
+                localStorage.removeItem("spotiless_linked_playlist");
+                const acc = getStoredAccount();
+                renderAccountConnectedView((acc && acc.username) || "Player", false);
+                checkAccountState();
+                showToast("Spotify unlinked");
             });
         }
 
         // Sign Out / Disconnect Button
-        const btnLogoutEl = document.getElementById("btn-logout");
-        if (btnLogoutEl) {
-            btnLogoutEl.addEventListener("click", (e) => {
+        if (btnLogout) {
+            btnLogout.addEventListener("click", async (e) => {
                 if (e) e.preventDefault();
+                localStorage.removeItem("spotiless_account");
                 localStorage.removeItem("spotiless_account_name");
                 localStorage.removeItem("spotiless_account_email");
                 localStorage.removeItem("spotiless_username");
                 localStorage.removeItem("spotiless_account_has_pass");
                 localStorage.removeItem("spotiless_sp_dc");
                 localStorage.removeItem("sp_dc");
+                localStorage.removeItem("spotiless_linked_playlist");
+                sessionStorage.removeItem("spotiless_guest_session");
 
-                const unconnectedView = document.getElementById("auth-unconnected-view");
-                const connectedView = document.getElementById("auth-connected-view");
-                if (unconnectedView) {
-                    unconnectedView.classList.remove("hidden");
-                    unconnectedView.style.display = "block";
+                if (!isCloudMode) {
+                    try {
+                        await fetch("/api/auth/logout", { method: "POST" });
+                    } catch (err) {}
                 }
-                if (connectedView) {
-                    connectedView.classList.add("hidden");
-                    connectedView.style.display = "none";
-                }
-                if (authStatusDot) authStatusDot.className = "dot-disconnected";
-                if (authUsernameLabel) authUsernameLabel.textContent = "Connect Spotify";
 
                 window.setAccountMode("signin");
+                checkAccountState();
+                scrollAuthModalToTop();
+                showToast("Signed out.");
             });
         }
 
@@ -421,34 +545,14 @@ document.addEventListener("DOMContentLoaded", () => {
         if (btnGuestPlay) {
             btnGuestPlay.addEventListener("click", (e) => {
                 if (e) e.preventDefault();
-                if (modalAuth) modalAuth.classList.add("hidden");
+                sessionStorage.setItem("spotiless_guest_session", "true");
+                showToast("Playing as Guest! Enjoy the music 🎵");
+                window.closeAuthModalAndPlay();
             });
         }
-
-        // Cookie tab link button
-        const btnSaveCookie = document.getElementById("btn-save-cookie");
-        const inputCookieSpdc = document.getElementById("input-cookie-spdc");
-        if (btnSaveCookie) {
-            btnSaveCookie.addEventListener("click", (e) => {
-                if (e) e.preventDefault();
-                const raw = (inputCookieSpdc ? inputCookieSpdc.value : "").trim();
-                if (!raw) {
-                    alert("Please paste your sp_dc cookie.");
-                    return;
-                }
-                const match = raw.match(/sp_dc=([a-zA-Z0-9_\-]+)/);
-                const cookieVal = match ? match[1] : raw;
-                localStorage.setItem("spotiless_sp_dc", cookieVal);
-                localStorage.setItem("sp_dc", cookieVal);
-                if (modalAuth) modalAuth.classList.add("hidden");
-                checkStoredAccount();
-            });
-        }
-
-        checkStoredAccount();
     }
 
-    setTimeout(initUnifiedAuthHandlers, 50);
+    initUnifiedAuthHandlers();
 
     // Mode Modal elements
     const userPlaylistsGrid = document.getElementById("user-playlists-grid");
@@ -456,15 +560,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Waveform Canvas
     const canvas = document.getElementById("waveform-canvas");
-    const canvasCtx = canvas.getContext("2d");
+    const canvasCtx = canvas ? canvas.getContext("2d") : null;
 
     // App State
     let currentRound = null;
     let selectedTrack = null;
     let searchTimeout = null;
     let focusedItemIndex = -1;
-    let authPollingInterval = null;
-        let shareTextCache = "";
+    let shareTextCache = "";
     let isCloudMode = false;
 
     // ----------------- Cloud Standalone Mode Engine -----------------
@@ -701,6 +804,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function drawVisualizer() {
         requestAnimationFrame(drawVisualizer);
+        if (!canvas || !canvasCtx) return;
         canvasCtx.clearRect(0, 0, canvas.width, canvas.height);
 
         const bufferLength = 64;
@@ -924,83 +1028,41 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function checkAccountState() {
         const acc = getStoredAccount();
-        const cookie = localStorage.getItem("spotiless_sp_dc");
+        const cookie = getSpotifyCookie();
         const guest = sessionStorage.getItem("spotiless_guest_session");
-
-        const userTierBadge = document.getElementById("user-tier-badge");
-        const spotifyLinkPill = document.getElementById("spotify-link-pill");
-        const boxSpotifyUnlinked = document.getElementById("box-spotify-unlinked");
-        const boxSpotifyLinked = document.getElementById("box-spotify-linked");
         const userPlaylistsStatusMsg = document.getElementById("user-playlists-status-msg");
 
         if (cookie) {
-            if (userTierBadge) {
-                userTierBadge.textContent = "Spotify Linked 🍪";
-                userTierBadge.style.background = "var(--color-spotify)";
-                userTierBadge.style.color = "#000";
-            }
-            if (spotifyLinkPill) {
-                spotifyLinkPill.textContent = "✓ Connected";
-                spotifyLinkPill.style.background = "rgba(29, 185, 84, 0.2)";
-                spotifyLinkPill.style.color = "var(--color-spotify)";
-            }
-            if (boxSpotifyUnlinked) boxSpotifyUnlinked.classList.add("hidden");
-            if (boxSpotifyLinked) boxSpotifyLinked.classList.remove("hidden");
             if (userPlaylistsStatusMsg) {
                 userPlaylistsStatusMsg.innerHTML = '<p style="margin: 0 0 6px 0; font-weight: 700; color: #fff; font-size: 0.9rem;">Spotify Linked 🍪</p><p style="margin: 0 0 12px 0; font-size: 0.8rem; color: var(--color-text-muted);">Paste any playlist URL above to load songs instantly, or run desktop native mode to sync your created playlists.</p>';
             }
-        } else {
-            if (userTierBadge) {
-                userTierBadge.textContent = (acc && acc.username) ? "Spotify Not Linked" : "Guest";
-                userTierBadge.style.background = "rgba(255, 255, 255, 0.15)";
-                userTierBadge.style.color = "#ddd";
-            }
-            if (spotifyLinkPill) {
-                spotifyLinkPill.textContent = "Not Linked";
-                spotifyLinkPill.style.background = "rgba(255, 107, 107, 0.2)";
-                spotifyLinkPill.style.color = "#ff6b6b";
-            }
-            if (boxSpotifyUnlinked) boxSpotifyUnlinked.classList.remove("hidden");
-            if (boxSpotifyLinked) boxSpotifyLinked.classList.add("hidden");
-            if (userPlaylistsStatusMsg) {
-                userPlaylistsStatusMsg.innerHTML = '<p style="margin: 0 0 6px 0; font-weight: 700; color: #fff; font-size: 0.9rem;">No Spotify Account Linked</p><p style="margin: 0 0 12px 0; font-size: 0.8rem; color: var(--color-text-muted);">Connect your Spotify account to load and play your personal playlists here.</p><button type="button" class="btn btn-primary btn-sm" onclick="document.getElementById(\'modal-mode\').classList.add(\'hidden\'); document.getElementById(\'modal-auth\').classList.remove(\'hidden\');" style="font-weight: 800; font-size: 0.8rem;">🔗 Connect Spotify Account</button>';
-            }
+        } else if (userPlaylistsStatusMsg) {
+            userPlaylistsStatusMsg.innerHTML = '<p style="margin: 0 0 6px 0; font-weight: 700; color: #fff; font-size: 0.9rem;">No Spotify Account Linked</p><p style="margin: 0 0 12px 0; font-size: 0.8rem; color: var(--color-text-muted);">Connect your Spotify account to load and play your personal playlists here.</p><button type="button" class="btn btn-primary btn-sm" onclick="document.getElementById(\'modal-mode\').classList.add(\'hidden\'); if(window.openAuthModal){window.openAuthModal();}else{document.getElementById(\'modal-auth\').classList.remove(\'hidden\');}" style="font-weight: 800; font-size: 0.8rem;">🔗 Connect Spotify Account</button>';
         }
 
         if (acc && acc.username) {
-            authStatusDot.className = "dot-connected";
-            authUsernameLabel.textContent = acc.username;
-            if (userNameDisplay) userNameDisplay.textContent = acc.username;
-            if (authConnectedView) authConnectedView.classList.remove("hidden");
-            const unconnected = document.getElementById("auth-unconnected-view");
-            if (unconnected) unconnected.classList.add("hidden");
+            renderAccountConnectedView(acc.username, !!cookie);
         } else if (cookie) {
-            authStatusDot.className = "dot-connected";
-            authUsernameLabel.textContent = "Spotify Linked 🍪";
-            if (userNameDisplay) userNameDisplay.textContent = "Spotify Cookie Linked";
-            if (authConnectedView) authConnectedView.classList.remove("hidden");
-            const unconnected = document.getElementById("auth-unconnected-view");
-            if (unconnected) unconnected.classList.add("hidden");
+            renderAccountConnectedView("Spotify Cookie User", true);
         } else {
-            authStatusDot.className = "dot-disconnected";
-            authUsernameLabel.textContent = "Connect Spotify";
-            if (authConnectedView) authConnectedView.classList.add("hidden");
+            if (authStatusDot) authStatusDot.className = "dot-disconnected";
+            if (authUsernameLabel) authUsernameLabel.textContent = "Connect Spotify";
             const unconnected = document.getElementById("auth-unconnected-view");
-            if (unconnected) unconnected.classList.remove("hidden");
+            const connected = document.getElementById("auth-connected-view");
+            if (connected) {
+                connected.classList.add("hidden");
+                connected.style.setProperty("display", "none", "important");
+            }
+            if (unconnected) {
+                unconnected.classList.remove("hidden");
+                unconnected.style.setProperty("display", "block", "important");
+            }
 
             // First visit prompt if not guest
-            if (!guest && !acc && !cookie) {
+            if (!guest && modalAuth && !window.__INITIAL_AUTH_PROMPTED__) {
+                window.__INITIAL_AUTH_PROMPTED__ = true;
                 modalAuth.classList.remove("hidden");
             }
-        }
-    }
-
-    function getStoredAccount() {
-        try {
-            const raw = localStorage.getItem("spotiless_account");
-            return raw ? JSON.parse(raw) : null;
-        } catch (e) {
-            return null;
         }
     }
 
@@ -1568,9 +1630,15 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     async function openModeModal() {
+        if (!modalMode) return;
         modalMode.classList.remove("hidden");
+        if (isCloudMode) {
+            checkAccountState();
+            return;
+        }
         try {
             const res = await fetch("/api/playlists");
+            if (!res.ok) return;
             const data = await res.json();
             cachedUserPlaylists = data.my_playlists || data.playlists || [];
             renderUserPlaylists(cachedUserPlaylists);
@@ -1714,6 +1782,10 @@ document.addEventListener("DOMContentLoaded", () => {
         btnLoadCustom.addEventListener("click", async () => {
             const val = inputCustom.value.trim();
             if (!val) return;
+            if (isCloudMode) {
+                await handleSpotifyLinkInput(val, inputCustom);
+                return;
+            }
             btnLoadCustom.disabled = true;
             btnLoadCustom.textContent = "Loading...";
             try {
@@ -1740,279 +1812,7 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // ----------------- Spotify Auth Modal -----------------
-    let isSignUpMode = true;
-
-    function openAuthModal() {
-        modalAuth.classList.remove("hidden");
-    }
-
-    // Tabs inside Auth modal
-    const tabBtns = document.querySelectorAll(".auth-tabs .tab-btn");
-    tabBtns.forEach(btn => {
-        btn.addEventListener("click", () => {
-            tabBtns.forEach(b => b.classList.remove("active"));
-            document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
-            btn.classList.add("active");
-            const target = document.getElementById(btn.dataset.tab);
-            if (target) target.classList.add("active");
-        });
-    });
-
-    // Account Creation / Sign In form
-    const formLocalAccount = document.getElementById("form-local-account");
-    const accUserInput = document.getElementById("acc-username-input");
-    const accPassInput = document.getElementById("acc-password-input");
-    const btnToggleAccountMode = document.getElementById("btn-toggle-account-mode");
-    const formAccTitle = document.getElementById("form-acc-title");
-    const btnSubmitAccount = document.getElementById("btn-submit-account");
-    const tabModeSignUp = document.getElementById("tab-mode-signup");
-    const tabModeSignIn = document.getElementById("tab-mode-signin");
-
-    if (tabModeSignUp) {
-        tabModeSignUp.addEventListener("click", () => {
-            if (window.setAccountMode) window.setAccountMode("signup");
-        });
-    }
-    if (tabModeSignIn) {
-        tabModeSignIn.addEventListener("click", () => {
-            if (window.setAccountMode) window.setAccountMode("signin");
-        });
-    }
-
-    if (btnToggleAccountMode) {
-        btnToggleAccountMode.addEventListener("click", (e) => {
-            if (e) e.preventDefault();
-            if (window.toggleAccountAuthMode) {
-                window.toggleAccountAuthMode(e);
-            } else {
-                isSignUpMode = !isSignUpMode;
-                window.isSignUpMode = isSignUpMode;
-                if (isSignUpMode) {
-                    if (formAccTitle) formAccTitle.textContent = "Create Your Permanent Account";
-                    if (btnSubmitAccount) btnSubmitAccount.textContent = "Create Permanent Account & Play";
-                    btnToggleAccountMode.textContent = "Already have an account? Sign In";
-                } else {
-                    if (formAccTitle) formAccTitle.textContent = "Sign In to Your Account";
-                    if (btnSubmitAccount) btnSubmitAccount.textContent = "Sign In & Play";
-                    btnToggleAccountMode.textContent = "Need an account? Sign Up";
-                }
-            }
-        });
-    }
-
-    if (formLocalAccount) {
-        formLocalAccount.addEventListener("submit", (e) => {
-            e.preventDefault();
-            const usernameInput = document.getElementById("acc-username-input");
-            const passwordInput = document.getElementById("acc-password-input");
-            const rawUser = (usernameInput?.value || "").trim();
-            const p = (passwordInput?.value || "").trim();
-            if (!rawUser || !p) {
-                showToast("Please enter a username or email and password");
-                return;
-            }
-            try {
-                // Support both email and username: if email is typed, extract clean display handle
-                let displayName = rawUser;
-                let emailStr = "";
-                if (rawUser.includes("@")) {
-                    emailStr = rawUser;
-                    displayName = rawUser.split("@")[0].trim() || rawUser;
-                }
-
-                const isSigningIn = (window.isSignUpMode === false);
-                const existingAcc = getStoredAccount() || {};
-
-                if (isSigningIn) {
-                    // Sign In: save account, sync UI
-                    const acc = {
-                        ...existingAcc,
-                        username: displayName,
-                        email: emailStr || existingAcc.email || "",
-                        raw_input: rawUser,
-                        logged_in_at: Date.now()
-                    };
-                    localStorage.setItem("spotiless_account", JSON.stringify(acc));
-                    checkAccountState();
-
-                    // If Spotify is already linked, close modal and let them play!
-                    if (localStorage.getItem("spotiless_sp_dc")) {
-                        showToast(`Signed in as ${displayName}! 🎉`);
-                        closeModals();
-                    } else {
-                        // Prompt directly to connect Spotify!
-                        showToast(`Signed in as ${displayName}! Connect Spotify below.`);
-                        const welcomeBanner = document.getElementById("account-welcome-banner");
-                        if (welcomeBanner) {
-                            welcomeBanner.textContent = `👋 Welcome back, ${displayName}! Connect your Spotify below to play your personal playlists, or tap Play Free Hits.`;
-                            welcomeBanner.classList.remove("hidden");
-                        }
-                        const inputSpdc = document.getElementById("input-connected-cookie-spdc");
-                        if (inputSpdc) {
-                            setTimeout(() => inputSpdc.focus(), 300);
-                        }
-                    }
-                    return;
-                }
-
-                // Sign Up: save account, sync UI, guide to Spotify linking
-                const acc = {
-                    ...existingAcc,
-                    username: displayName,
-                    email: emailStr || existingAcc.email || "",
-                    raw_input: rawUser,
-                    created_at: Date.now()
-                };
-                localStorage.setItem("spotiless_account", JSON.stringify(acc));
-                checkAccountState();
-                showToast(`Welcome, ${displayName}! Connect Spotify below.`);
-                const welcomeBanner = document.getElementById("account-welcome-banner");
-                if (welcomeBanner) {
-                    welcomeBanner.textContent = `🎉 Account created for ${displayName}! Connect your Spotify below to link your playlists, or play free hits now.`;
-                    welcomeBanner.classList.remove("hidden");
-                }
-                const inputSpdc = document.getElementById("input-connected-cookie-spdc");
-                if (inputSpdc) {
-                    setTimeout(() => inputSpdc.focus(), 300);
-                }
-            } catch (err) {
-                showToast("Failed to save account");
-            }
-        });
-    }
-
-    // Cookie Linking
-    const inputCookieSpdc = document.getElementById("input-cookie-spdc");
-    const btnSaveCookie = document.getElementById("btn-save-cookie");
-    const btnSaveConnectedCookie = document.getElementById("btn-save-connected-cookie");
-    const inputConnectedCookieSpdc = document.getElementById("input-connected-cookie-spdc");
-    const btnUnlinkSpotify = document.getElementById("btn-unlink-spotify");
-
-    if (btnSaveConnectedCookie) {
-        btnSaveConnectedCookie.addEventListener("click", () => {
-            const val = (inputConnectedCookieSpdc?.value || "").trim();
-            if (!val) {
-                showToast("Please paste your sp_dc cookie");
-                return;
-            }
-            try {
-                localStorage.setItem("spotiless_sp_dc", val);
-                showToast("Spotify linked successfully! 🍪");
-                checkAccountState();
-                if (inputConnectedCookieSpdc) inputConnectedCookieSpdc.value = "";
-                closeModals();
-            } catch (e) {
-                showToast("Failed to save cookie");
-            }
-        });
-    }
-
-    if (btnUnlinkSpotify) {
-        btnUnlinkSpotify.addEventListener("click", () => {
-            try {
-                localStorage.removeItem("spotiless_sp_dc");
-                showToast("Spotify unlinked");
-                checkAccountState();
-            } catch (e) {
-                showToast("Failed to unlink Spotify");
-            }
-        });
-    }
-    if (btnSaveCookie && inputCookieSpdc) {
-        btnSaveCookie.addEventListener("click", () => {
-            const val = inputCookieSpdc.value.trim();
-            if (!val) {
-                alert("Please paste your Spotify sp_dc cookie first.");
-                return;
-            }
-            localStorage.setItem("spotiless_sp_dc", val);
-            showToast("Spotify cookie linked for this session! 🍪");
-            checkAccountState();
-            closeModals();
-        });
-    }
-
-    // Free Guest Play
-    const btnGuestPlayDirect = document.getElementById("btn-guest-play-direct");
-    if (btnGuestPlayDirect) {
-        btnGuestPlayDirect.addEventListener("click", () => {
-            sessionStorage.setItem("spotiless_guest_session", "true");
-            showToast("Playing as Guest! Enjoy the music 🎵");
-            closeModals();
-        });
-    }
-
-    // Edit Username Handlers
-    const btnShowEditUsername = document.getElementById("btn-show-edit-username");
-    const btnShowEditUsernameBottom = document.getElementById("btn-show-edit-username-bottom");
-    const boxEditUsername = document.getElementById("box-edit-username");
-    const inputNewUsername = document.getElementById("input-new-username");
-    const btnSaveNewUsername = document.getElementById("btn-save-new-username");
-    const btnCancelEditUsername = document.getElementById("btn-cancel-edit-username");
-
-    function toggleEditUsernameBox() {
-        if (!boxEditUsername) return;
-        boxEditUsername.classList.toggle("hidden");
-        if (!boxEditUsername.classList.contains("hidden") && inputNewUsername) {
-            const acc = getStoredAccount();
-            inputNewUsername.value = acc && acc.username ? acc.username : "";
-            inputNewUsername.focus();
-            inputNewUsername.select();
-        }
-    }
-
-    if (btnShowEditUsername) {
-        btnShowEditUsername.addEventListener("click", toggleEditUsernameBox);
-    }
-    if (btnShowEditUsernameBottom) {
-        btnShowEditUsernameBottom.addEventListener("click", toggleEditUsernameBox);
-    }
-
-    if (btnCancelEditUsername && boxEditUsername) {
-        btnCancelEditUsername.addEventListener("click", () => {
-            boxEditUsername.classList.add("hidden");
-        });
-    }
-
-    if (btnSaveNewUsername && inputNewUsername) {
-        btnSaveNewUsername.addEventListener("click", () => {
-            const newName = inputNewUsername.value.trim();
-            if (!newName) {
-                alert("Please enter a username.");
-                return;
-            }
-            const acc = getStoredAccount() || {};
-            acc.username = newName;
-            localStorage.setItem("spotiless_account", JSON.stringify(acc));
-            if (userNameDisplay) userNameDisplay.textContent = newName;
-            if (authUsernameLabel) authUsernameLabel.textContent = newName;
-            if (boxEditUsername) boxEditUsername.classList.add("hidden");
-            showToast(`Username updated to ${newName}! ✨`);
-        });
-
-        inputNewUsername.addEventListener("keydown", (e) => {
-            if (e.key === "Enter") {
-                e.preventDefault();
-                btnSaveNewUsername.click();
-            }
-        });
-    }
-
-    // Logout / Disconnect
-    if (btnLogout) {
-        btnLogout.addEventListener("click", async () => {
-            localStorage.removeItem("spotiless_account");
-            localStorage.removeItem("spotiless_sp_dc");
-            sessionStorage.removeItem("spotiless_guest_session");
-            try {
-                await fetch("/api/auth/logout", { method: "POST" });
-            } catch (e) {}
-            showToast("Signed out.");
-            checkAccountState();
-            closeModals();
-        });
-    }
+    // (Auth handlers managed by Unified Account & Spotify Link Controller above)
 
         // ----------------- Stats Modal -----------------
     async function openStatsModal() {
@@ -2112,21 +1912,26 @@ document.addEventListener("DOMContentLoaded", () => {
     // ----------------- Global Event Listeners -----------------
     function setupEventListeners() {
         // Play snippet button
-        btnPlay.addEventListener("click", () => {
-            if (currentRound) {
-                audio.toggle(currentRound.unlocked_seconds);
-            }
-        });
+        if (btnPlay) {
+            btnPlay.addEventListener("click", () => {
+                if (currentRound) {
+                    audio.toggle(currentRound.unlocked_seconds);
+                }
+            });
+        }
 
         // Submit & Skip & Give Up
-        btnSubmit.addEventListener("click", submitCurrentGuess);
-        btnSkip.addEventListener("click", skipCurrentAttempt);
-        btnGiveUp.addEventListener("click", giveUpRound);
+        if (btnSubmit) btnSubmit.addEventListener("click", submitCurrentGuess);
+        if (btnSkip) btnSkip.addEventListener("click", skipCurrentAttempt);
+        if (btnGiveUp) btnGiveUp.addEventListener("click", giveUpRound);
 
         // Header Modals
-        document.getElementById("btn-open-mode").addEventListener("click", openModeModal);
-        document.getElementById("btn-open-stats").addEventListener("click", openStatsModal);
-        document.getElementById("btn-open-auth").addEventListener("click", openAuthModal);
+        const btnOpenMode = document.getElementById("btn-open-mode");
+        const btnOpenStats = document.getElementById("btn-open-stats");
+        const btnOpenAuth = document.getElementById("btn-open-auth");
+        if (btnOpenMode) btnOpenMode.addEventListener("click", openModeModal);
+        if (btnOpenStats) btnOpenStats.addEventListener("click", openStatsModal);
+        if (btnOpenAuth) btnOpenAuth.addEventListener("click", window.openAuthModal);
         if (btnThemeToggle) btnThemeToggle.addEventListener("click", toggleTheme);
 
         // Privacy & Data Deletion
