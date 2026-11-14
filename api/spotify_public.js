@@ -3,13 +3,22 @@
 // 2. Strict Fast-Path Budget: Capped at 1–2 tool calls total (Read -> Edit -> Done).
 // 3. Do not wander or perform exploratory sweeps. Make direct edits cleanly.
 
+const crypto = require("crypto");
+
 const USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 
-const USER_ALIASES = {
-    "cole.__": "31leppthj2runlbv3x6juui65bpa",
-    "cole": "31leppthj2runlbv3x6juui65bpa",
-    "cdblair418@gmail.com": "31leppthj2runlbv3x6juui65bpa"
+const HASHED_USER_ALIASES = {
+    "1289b46b9fefb4d6d5fe0ec53879d82124343a5d77332f155cca0e8e822b888a": "31leppthj2runlbv3x6juui65bpa",
+    "f78b6cb9224209fe21027f4f6addf57ef2fdf4392e9362095ea8de7377f5451e": "31leppthj2runlbv3x6juui65bpa"
 };
+
+const SUPPLEMENTAL_USER_PLAYLISTS = {
+    "31leppthj2runlbv3x6juui65bpa": ["0fJ7qgTlbrwhsLuaToLpTt", "2Tdpwn6eJK39LMJKkbsuzH"]
+};
+
+const EXCLUDED_THIRD_PARTY_IDS = new Set([
+    "37i9dQZF1EIcpZCXN80nLP"
+]);
 
 const ALLOWED_PROXY_HOSTS = [
     "p.scdn.co",
@@ -27,7 +36,8 @@ function extractUserId(raw) {
     if (uriMatch) val = uriMatch[1];
     val = val.split("?")[0].split("#")[0].trim();
     const lower = val.toLowerCase();
-    return USER_ALIASES[lower] || val;
+    const hash = crypto.createHash("sha256").update(lower).digest("hex");
+    return HASHED_USER_ALIASES[hash] || val;
 }
 
 function extractPlaylistId(raw) {
@@ -404,7 +414,17 @@ module.exports = async function handler(req, res) {
             });
         }
 
-        const topPlaylists = playlists.slice(0, 5);
+        const supplementalIds = SUPPLEMENTAL_USER_PLAYLISTS[userId] || [];
+        const existingPlIds = new Set(playlists.map((p) => p.id));
+        supplementalIds.forEach((pid) => {
+            if (!existingPlIds.has(pid)) {
+                existingPlIds.add(pid);
+                playlists.push({ id: pid, name: "Public Playlist", image: "", tracks_count: null });
+            }
+        });
+
+        const filteredPlaylists = playlists.filter((p) => p && p.id && !EXCLUDED_THIRD_PARTY_IDS.has(p.id));
+        const topPlaylists = filteredPlaylists.slice(0, 25);
         const results = await Promise.allSettled(topPlaylists.map((p) => fetchPlaylistEmbed(p.id)));
 
         const hydratedPlaylists = [];

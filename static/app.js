@@ -373,6 +373,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     if (Array.isArray(data.playlists) && data.playlists.length) {
                         try {
                             localStorage.setItem("spotiless_public_playlists", JSON.stringify(data.playlists));
+                            localStorage.setItem("spotiless_playlists_schema", "v1.4.5");
                         } catch (e) {}
                         cachedUserPlaylists = data.playlists;
                     }
@@ -639,6 +640,55 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // ----------------- Cloud Standalone Mode Engine -----------------
     let consecutiveAutoSkips = 0;
+    let refreshPlaylistsInFlight = null;
+
+    async function refreshLinkedUserPlaylistsIfNeeded(force = false) {
+        if (!isCloudMode) return false;
+        let linkedUser = "";
+        let schema = "";
+        try {
+            linkedUser = localStorage.getItem("spotiless_linked_user") || "";
+            schema = localStorage.getItem("spotiless_playlists_schema") || "";
+        } catch (e) {}
+
+        if (!linkedUser) return false;
+        if (!force && schema === "v1.4.5") return false;
+        if (refreshPlaylistsInFlight) return refreshPlaylistsInFlight;
+
+        refreshPlaylistsInFlight = (async () => {
+            try {
+                const res = await fetch(`/api/spotify_public?user=${encodeURIComponent(linkedUser)}`);
+                if (!res.ok) return false;
+                const data = await res.json();
+                if (!data || !data.success || !Array.isArray(data.playlists) || !data.playlists.length) {
+                    return false;
+                }
+                try {
+                    localStorage.setItem("spotiless_public_playlists", JSON.stringify(data.playlists));
+                    localStorage.setItem("spotiless_playlists_schema", "v1.4.5");
+                    if (Array.isArray(data.tracks) && data.tracks.length && localStorage.getItem("spotiless_custom_cloud_tracks")) {
+                        const curPoolName = localStorage.getItem("spotiless_custom_pool_name") || "";
+                        if (!curPoolName || curPoolName.includes("Public Playlists")) {
+                            CloudGameManager.loadCustomPool(data.tracks, curPoolName || `🎵 ${data.username || "Public"}'s Playlists`);
+                        }
+                    }
+                } catch (e) {}
+                cachedUserPlaylists = data.playlists;
+                if (userPlaylistsGrid) {
+                    renderUserPlaylists(cachedUserPlaylists);
+                    updateMultiPlaylistBar();
+                }
+                return true;
+            } catch (e) {
+                console.warn("Background public playlist refresh failed:", e);
+                return false;
+            } finally {
+                refreshPlaylistsInFlight = null;
+            }
+        })();
+
+        return refreshPlaylistsInFlight;
+    }
 
     const CloudGameManager = {
         defaultTracks: [],
@@ -696,6 +746,7 @@ document.addEventListener("DOMContentLoaded", () => {
             } catch (e) {}
 
             this.resetRound();
+            await refreshLinkedUserPlaylistsIfNeeded(false);
         },
 
         loadCustomPool: function(tracks, poolName, persist = true) {
@@ -934,9 +985,11 @@ document.addEventListener("DOMContentLoaded", () => {
         resetTimelineFills();
     };
 
+    let idleVisualizerDrawn = false;
     function drawVisualizer() {
         requestAnimationFrame(drawVisualizer);
         if (!canvas || !canvasCtx) return;
+        if (!audio.isPlaying && idleVisualizerDrawn) return;
         canvasCtx.clearRect(0, 0, canvas.width, canvas.height);
 
         const bufferLength = 64;
@@ -953,6 +1006,7 @@ document.addEventListener("DOMContentLoaded", () => {
             canvasCtx.fillRect(x, (canvas.height - barHeight) / 2, barWidth - 1, Math.max(barHeight, 2));
             x += barWidth;
         }
+        idleVisualizerDrawn = !audio.isPlaying;
     }
     drawVisualizer();
 
@@ -1811,6 +1865,7 @@ document.addEventListener("DOMContentLoaded", () => {
             checkAccountState();
             renderCuratedPlaylists(CLOUD_CURATED_PLAYLISTS);
             updateMultiPlaylistBar();
+            refreshLinkedUserPlaylistsIfNeeded(false);
             return;
         }
         try {

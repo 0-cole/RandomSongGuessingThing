@@ -2161,3 +2161,48 @@ body.light-theme kbd {
 #modal-privacy.hidden {
     display: none !important;
 }
+
+#loading-spinner,
+#yt-hidden-wrapper,
+#yt-hidden-player {
+    pointer-events: none !important;
+}
+
+/* Mobile & iOS Safari WebKit compositor / post-screenshot touch safety */
+@media (max-width: 768px), (hover: none) and (pointer: coarse) {
+    body::before {
+        animation: none !important;
+        will-change: auto !important;
+    }
+
+    body::after {
+        display: none !important;
+        animation: none !important;
+        -webkit-mask-image: none !important;
+        mask-image: none !important;
+        will-change: auto !important;
+    }
+
+    .navbar,
+    .modal-overlay {
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+    }
+
+    .modal-overlay {
+        background: rgba(12, 13, 15, 0.94);
+    }
+
+    .modal-card {
+        -webkit-overflow-scrolling: touch;
+    }
+
+    button,
+    .btn,
+    .playlist-card,
+    .nav-pill,
+    .icon-button,
+    a {
+        touch-action: manipulation;
+    }
+}

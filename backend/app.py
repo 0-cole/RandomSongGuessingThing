@@ -14,7 +14,7 @@ from backend.game_engine import GameEngine
 
 STATIC_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
 
-__version__ = '1.4.4'
+__version__ = '1.4.5'
 
 app = Flask(__name__, static_folder=STATIC_DIR)
 
@@ -223,16 +223,20 @@ def spotify_public_endpoint():
     import re
     import json
     import base64
+    import hashlib
     import urllib.parse
     import concurrent.futures
     import requests as req_lib
 
     ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-    aliases = {
-        "cole.__": "31leppthj2runlbv3x6juui65bpa",
-        "cole": "31leppthj2runlbv3x6juui65bpa",
-        "cdblair418@gmail.com": "31leppthj2runlbv3x6juui65bpa",
+    hashed_aliases = {
+        "1289b46b9fefb4d6d5fe0ec53879d82124343a5d77332f155cca0e8e822b888a": "31leppthj2runlbv3x6juui65bpa",
+        "f78b6cb9224209fe21027f4f6addf57ef2fdf4392e9362095ea8de7377f5451e": "31leppthj2runlbv3x6juui65bpa",
     }
+    supplemental_user_playlists = {
+        "31leppthj2runlbv3x6juui65bpa": ["0fJ7qgTlbrwhsLuaToLpTt", "2Tdpwn6eJK39LMJKkbsuzH"],
+    }
+    excluded_third_party_ids = {"37i9dQZF1EIcpZCXN80nLP"}
 
     def parse_next_data(html_text):
         m = re.search(r'<script id="__NEXT_DATA__" type="application/json">([\s\S]*?)</script>', html_text)
@@ -370,7 +374,8 @@ def spotify_public_endpoint():
 
         um = re.search(r"(?:open\.spotify\.com/user/|spotify:user:)([a-zA-Z0-9_.-]+)", user_arg, re.I)
         uid = (um.group(1) if um else user_arg).split("?")[0].split("#")[0].strip()
-        uid = aliases.get(uid.lower(), uid)
+        uid_hash = hashlib.sha256(uid.lower().encode("utf-8")).hexdigest()
+        uid = hashed_aliases.get(uid_hash, uid)
 
         playlists = []
         display_name = uid
@@ -391,17 +396,25 @@ def spotify_public_endpoint():
                         for entry in (uobj.get("publicPlaylistsV2") or {}).get("items") or []:
                             e_uri = entry.get("_uri") or (entry.get("data") or {}).get("uri") or ""
                             pid = e_uri.split(":")[-1]
-                            if pid:
+                            if pid and pid not in excluded_third_party_ids:
                                 pdata = entry.get("data") or {}
                                 playlists.append({"id": pid, "name": pdata.get("name", "Public Playlist"), "image": "", "tracks_count": None})
         except Exception:
             pass
 
+        existing_ids = {p["id"] for p in playlists}
+        for sup_id in supplemental_user_playlists.get(uid, []):
+            if sup_id not in existing_ids:
+                existing_ids.add(sup_id)
+                playlists.append({"id": sup_id, "name": "Public Playlist", "image": "", "tracks_count": None})
+
+        playlists = [p for p in playlists if p.get("id") not in excluded_third_party_ids]
+
         if not playlists:
             return jsonify({"success": False, "error": "Could not find any public playlists for that Spotify username. Make sure your playlists are set to Public on Spotify."}), 404
 
-        top_pls = playlists[:5]
-        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as pool:
+        top_pls = playlists[:25]
+        with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
             fetched = list(pool.map(lambda p: fetch_playlist_embed(p["id"]), top_pls))
 
         hydrated_pls = []

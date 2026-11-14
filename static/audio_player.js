@@ -92,10 +92,18 @@ class MicroAudioEngine {
         if (!videoId) return Promise.resolve(false);
         return new Promise((resolve) => {
             if (!document.getElementById("yt-hidden-player")) {
+                let wrapper = document.getElementById("yt-hidden-wrapper");
+                if (!wrapper) {
+                    wrapper = document.createElement("div");
+                    wrapper.id = "yt-hidden-wrapper";
+                    wrapper.setAttribute("aria-hidden", "true");
+                    wrapper.style.cssText = "position:fixed;left:-9999px;top:-9999px;width:1px;height:1px;opacity:0;pointer-events:none;z-index:-9999;overflow:hidden;";
+                    document.body.appendChild(wrapper);
+                }
                 const holder = document.createElement("div");
                 holder.id = "yt-hidden-player";
-                holder.style.cssText = "position:fixed;bottom:-10px;right:-10px;width:1px;height:1px;opacity:0.001;pointer-events:none;z-index:-1;overflow:hidden;";
-                document.body.appendChild(holder);
+                holder.style.cssText = "width:1px;height:1px;pointer-events:none;";
+                wrapper.appendChild(holder);
             }
 
             const initOrCue = () => {
@@ -129,6 +137,12 @@ class MicroAudioEngine {
                             onReady: () => {
                                 this.ytReady = true;
                                 try {
+                                    const iframe = this.ytPlayer.getIframe && this.ytPlayer.getIframe();
+                                    if (iframe) {
+                                        iframe.setAttribute("tabindex", "-1");
+                                        iframe.setAttribute("aria-hidden", "true");
+                                        iframe.style.pointerEvents = "none";
+                                    }
                                     this.ytPlayer.unMute();
                                     this.ytPlayer.setVolume(100);
                                 } catch (e) {}

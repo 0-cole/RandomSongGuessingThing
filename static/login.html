@@ -22,7 +22,7 @@
             } catch (e) {}
         })();
     </script>
-    <link rel="stylesheet" href="style.css?v=1.4.4">
+    <link rel="stylesheet" href="style.css?v=1.4.5">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400..800;1,9..40,400..800&family=Poppins:wght@600;700;800;900&display=swap" rel="stylesheet">
@@ -232,7 +232,7 @@
 
                     <div>
                         <label class="login-field-label" for="login-spotify-input">Spotify Username or Public Playlist Link <span style="font-weight: 400; color: var(--color-text-subtle);">(optional — playlists must be Public)</span></label>
-                        <input type="text" id="login-spotify-input" class="login-input" placeholder="e.g. cole.__ or open.spotify.com/playlist/...">
+                        <input type="text" id="login-spotify-input" class="login-input" placeholder="Paste your Spotify profile link, username, or public playlist link">
                     </div>
 
                     <div class="btn-row-stack">
@@ -260,7 +260,7 @@
                 <div id="spotify-status-msg" class="login-status-banner hidden"></div>
 
                 <div style="display: flex; flex-direction: column; gap: 10px;">
-                    <input type="text" id="spotify-link-field" class="login-input" placeholder="Spotify username (e.g. cole.__) or playlist link">
+                    <input type="text" id="spotify-link-field" class="login-input" placeholder="Paste Spotify username, profile link, or public playlist link">
                     <button type="button" id="btn-link-spotify-play" class="btn btn-primary btn-full" onclick="connectSpotifyAndPlay()" style="font-weight: 800;">
                         &#127925; Load Public Playlists &amp; Play
                     </button>
@@ -377,6 +377,7 @@
                     localStorage.setItem("spotiless_custom_cloud_tracks", JSON.stringify(data.tracks));
                     localStorage.setItem("spotiless_custom_pool_name", poolTitle);
                     localStorage.setItem("spotiless_public_playlists", JSON.stringify(data.playlists || []));
+                    localStorage.setItem("spotiless_playlists_schema", "v1.4.5");
                     localStorage.setItem("spotiless_cloud_index", "0");
                     if (data.user_id || !isPlaylist) {
                         localStorage.setItem("spotiless_linked_user", data.username || trimmed);

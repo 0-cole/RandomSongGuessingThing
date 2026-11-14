@@ -18,7 +18,7 @@
 
 ## 1. Executive Summary & High-Level Objective
 - **Project**: Spotiless (Songless — Spotify Edition), an endless music guessing game inspired by *Songless* (Lessgames) with microsecond-accurate snippet intervals (0.1s → 0.25s → 0.5s → 1.0s → 2.0s → 5.0s).
-- **Current Version**: `v1.4.4` (Public Spotify Playlists + Multi-Source Waterfall + Niche Auto-Skip Release)
+- **Current Version**: `v1.4.5` (Full Public Playlist Discovery, Mobile Screenshot Touch Fix & Hashed Alias Privacy)
 - **Official Branding**: **Spoti-Less** in-app / **Spotiless** for domain and repository links.
 - **Dual Architecture**:
   1. **Desktop Native Mode (`launcher.py` / `127.0.0.1:4321`)**: 100% Native Spotify Shannon cipher streaming over TCP port 4070 (`ap-gae2.spotify.com:4070`) using cached Librespot playback tokens and personal Spotify user libraries. Works even through school firewalls and FortiGuard blocks.
@@ -44,7 +44,13 @@
   - Ubiquitous Terms of Service & Privacy Policy modal (`#modal-privacy`) accessible via top navigation shield button (`#btn-nav-privacy`) and footer.
   - Data deletion copy preserved; wipe button earmarked for upcoming Settings menu.
 
-## 3. Recent Modifications & Verified State (`v1.4.4`)
+## 3. Recent Modifications & Verified State (`v1.4.5`)
+- **Username/Email Privacy Cleanup ([static/login.html](file:///d:/DOWNLOAD/RandomSongGuessingThing/static/login.html), [api/spotify_public.js](file:///d:/DOWNLOAD/RandomSongGuessingThing/api/spotify_public.js), [backend/app.py](file:///d:/DOWNLOAD/RandomSongGuessingThing/backend/app.py))**: Removed all hardcoded plaintext usernames and emails from HTML placeholders and server code; replaced internal alias lookup with SHA-256 hash matching.
+- **Full Public Playlist Loading ([api/spotify_public.js](file:///d:/DOWNLOAD/RandomSongGuessingThing/api/spotify_public.js), [backend/app.py](file:///d:/DOWNLOAD/RandomSongGuessingThing/backend/app.py), [static/app.js](file:///d:/DOWNLOAD/RandomSongGuessingThing/static/app.js))**: Raised Cloud Mode user playlist hydration limit from 5 to 25, included supplemental public user playlist IDs beyond Spotify's 10-card SSR preview, excluded third-party radio mixes, and added automatic `localStorage` schema refresh (`spotiless_playlists_schema = "v1.4.5"`).
+- **Mobile Screenshot Touch-Freeze Prevention ([static/style.css](file:///d:/DOWNLOAD/RandomSongGuessingThing/static/style.css), [static/app.js](file:///d:/DOWNLOAD/RandomSongGuessingThing/static/app.js), [static/audio_player.js](file:///d:/DOWNLOAD/RandomSongGuessingThing/static/audio_player.js))**: Disabled heavy animated backdrop/mask filters on mobile/touch viewports, ensured `#loading-spinner` and `#yt-hidden-wrapper` are strictly `pointer-events: none` / offscreen, added `touch-action: manipulation`, and stopped redundant idle canvas repaints in `drawVisualizer()`.
+- Bumped version and asset cache busters to `v1.4.5`.
+
+## 3b. Prior Verified State (`v1.4.4`)
 - [`api/spotify_public.js`](file:///d:/DOWNLOAD/RandomSongGuessingThing/api/spotify_public.js) & [`backend/app.py`](file:///d:/DOWNLOAD/RandomSongGuessingThing/backend/app.py): Added `/api/spotify_public` endpoint supporting `?user=` (public profile playlists), `?playlist=` (Spotify Embed tracks + previews), `?track_preview=&q=` (Spotify Embed -> iTunes -> Deezer -> YouTube ID waterfall), and CORS-safe `?proxy_audio=`. Bumped version to `v1.4.4`.
 - [`vercel.json`](file:///d:/DOWNLOAD/RandomSongGuessingThing/vercel.json): Configured `/api/:match*` pass-through before `/login` and SPA fallback rewrites.
 - [`static/audio_player.js`](file:///d:/DOWNLOAD/RandomSongGuessingThing/static/audio_player.js): Upgraded `MicroAudioEngine` with 4-stage preview resolution, `/api/spotify_public?proxy_audio=` fallback, Lobby98-style hidden YouTube IFrame Player (`#yt-hidden-player`), and fixed stray bracket syntax bug.
