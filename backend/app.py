@@ -14,7 +14,7 @@ from backend.game_engine import GameEngine
 
 STATIC_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
 
-__version__ = '1.4.3'
+__version__ = '1.4.4'
 
 app = Flask(__name__, static_folder=STATIC_DIR)
 
@@ -215,6 +215,215 @@ def search_tracks():
     q = request.args.get("q", "").strip()
     results = game_engine.search_candidates(q, limit=10)
     return jsonify({"results": results})
+
+# ----------------- Public Spotify / Multi-Source Endpoint -----------------
+
+@app.route("/api/spotify_public", methods=["GET"])
+def spotify_public_endpoint():
+    import re
+    import json
+    import base64
+    import urllib.parse
+    import concurrent.futures
+    import requests as req_lib
+
+    ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+    aliases = {
+        "cole.__": "31leppthj2runlbv3x6juui65bpa",
+        "cole": "31leppthj2runlbv3x6juui65bpa",
+        "cdblair418@gmail.com": "31leppthj2runlbv3x6juui65bpa",
+    }
+
+    def parse_next_data(html_text):
+        m = re.search(r'<script id="__NEXT_DATA__" type="application/json">([\s\S]*?)</script>', html_text)
+        if not m:
+            return None
+        try:
+            return json.loads(m.group(1))
+        except Exception:
+            return None
+
+    def fetch_playlist_embed(pid):
+        r = req_lib.get(f"https://open.spotify.com/embed/playlist/{urllib.parse.quote(pid)}", headers={"User-Agent": ua}, timeout=8)
+        if r.status_code != 200:
+            return {"playlist": None, "tracks": []}
+        nd = parse_next_data(r.text) or {}
+        state = nd.get("props", {}).get("pageProps", {}).get("state", {})
+        entity = state.get("data", {}).get("entity") or {}
+        if not entity:
+            return {"playlist": None, "tracks": []}
+        cover_sources = (entity.get("coverArt") or {}).get("sources") or (entity.get("visualIdentity") or {}).get("image") or []
+        cover_url = cover_sources[0].get("url", "") if cover_sources else ""
+        tracks = []
+        for t in entity.get("trackList") or []:
+            if not t or not t.get("title"):
+                continue
+            uri = t.get("uri", "")
+            tid = uri.split(":")[-1] if ":" in uri else (t.get("uid") or t.get("title"))
+            artist = (t.get("subtitle") or "").replace("\u00a0", " ").strip() or "Unknown Artist"
+            preview_url = (t.get("audioPreview") or {}).get("url") or ""
+            tracks.append({
+                "id": tid,
+                "uri": uri,
+                "name": str(t.get("title")).strip(),
+                "artist": artist,
+                "album_name": entity.get("title", ""),
+                "image_url": cover_url,
+                "thumbnail_url": cover_url,
+                "preview_url": preview_url,
+                "playlist_id": pid,
+                "playlist_name": entity.get("title", "Spotify Playlist"),
+            })
+        return {
+            "playlist": {"id": pid, "name": entity.get("title", "Spotify Playlist"), "image": cover_url, "tracks_count": len(tracks)},
+            "tracks": tracks,
+        }
+
+    proxy_audio = request.args.get("proxy_audio", "").strip()
+    if proxy_audio:
+        try:
+            parsed = urllib.parse.urlparse(proxy_audio)
+            allowed = ("p.scdn.co", "dzcdn.net", "mzstatic.com", "itunes.apple.com")
+            host = (parsed.hostname or "").lower()
+            if parsed.scheme != "https" or not any(host == h or host.endswith("." + h) for h in allowed):
+                return jsonify({"success": False, "error": "Disallowed proxy host"}), 400
+            ar = req_lib.get(proxy_audio, headers={"User-Agent": ua}, timeout=10)
+            if ar.status_code != 200:
+                return jsonify({"success": False, "error": "Upstream audio fetch failed"}), ar.status_code
+            return Response(ar.content, mimetype=ar.headers.get("Content-Type", "audio/mpeg"), headers={"Cache-Control": "public, max-age=86400"})
+        except Exception as exc:
+            return jsonify({"success": False, "error": str(exc)}), 502
+
+    track_preview = request.args.get("track_preview")
+    q_param = request.args.get("q", "").strip()
+    if track_preview is not None or q_param:
+        tid = (track_preview or "").strip()
+        preview_url = ""
+        source = ""
+        yt_id = ""
+        if tid and re.match(r"^[a-zA-Z0-9]{22}$", tid):
+            try:
+                er = req_lib.get(f"https://open.spotify.com/embed/track/{urllib.parse.quote(tid)}", headers={"User-Agent": ua}, timeout=6)
+                if er.status_code == 200:
+                    nd = parse_next_data(er.text) or {}
+                    ent = nd.get("props", {}).get("pageProps", {}).get("state", {}).get("data", {}).get("entity") or {}
+                    ap = (ent.get("audioPreview") or {}).get("url")
+                    if ap:
+                        preview_url = ap
+                        source = "spotify_embed"
+            except Exception:
+                pass
+        if not preview_url and q_param:
+            try:
+                ir = req_lib.get(f"https://itunes.apple.com/search?term={urllib.parse.quote(q_param)}&entity=song&limit=3", timeout=6)
+                if ir.status_code == 200:
+                    for hit in ir.json().get("results", []):
+                        if hit.get("previewUrl"):
+                            preview_url = hit["previewUrl"]
+                            source = "itunes"
+                            break
+            except Exception:
+                pass
+        if not preview_url and q_param:
+            try:
+                dr = req_lib.get(f"https://api.deezer.com/search?q={urllib.parse.quote(q_param)}&limit=3", timeout=6)
+                if dr.status_code == 200:
+                    for hit in dr.json().get("data", []):
+                        if hit.get("preview"):
+                            preview_url = hit["preview"]
+                            source = "deezer"
+                            break
+            except Exception:
+                pass
+        if q_param:
+            try:
+                yr = req_lib.get(f"https://www.youtube.com/results?search_query={urllib.parse.quote(q_param + ' official audio')}", headers={"User-Agent": ua}, timeout=6)
+                if yr.status_code == 200:
+                    ym = re.search(r'"videoId":"([a-zA-Z0-9_-]{11})"', yr.text)
+                    if ym:
+                        yt_id = ym.group(1)
+                        if not source:
+                            source = "youtube"
+            except Exception:
+                pass
+        return jsonify({"success": bool(preview_url or yt_id), "preview_url": preview_url, "source": source, "youtube_video_id": yt_id})
+
+    playlist_arg = request.args.get("playlist", "").strip()
+    if playlist_arg:
+        pm = re.search(r"(?:open\.spotify\.com/playlist/|spotify:playlist:)([a-zA-Z0-9]+)", playlist_arg, re.I)
+        pid = pm.group(1) if pm else playlist_arg.split("?")[0].split("#")[0].strip()
+        if not re.match(r"^[a-zA-Z0-9]{22}$", pid):
+            return jsonify({"success": False, "error": "Invalid Spotify playlist link or ID"}), 400
+        res_pl = fetch_playlist_embed(pid)
+        if not res_pl["tracks"]:
+            return jsonify({"success": False, "error": "No tracks found. Make sure the playlist is Public."}), 404
+        return jsonify({"success": True, "playlist": res_pl["playlist"], "playlists": [res_pl["playlist"]], "tracks": res_pl["tracks"]})
+
+    user_arg = request.args.get("user", "").strip()
+    if user_arg:
+        pm = re.search(r"(?:open\.spotify\.com/playlist/|spotify:playlist:)([a-zA-Z0-9]+)", user_arg, re.I)
+        if pm:
+            res_pl = fetch_playlist_embed(pm.group(1))
+            if not res_pl["tracks"]:
+                return jsonify({"success": False, "error": "Playlist has no tracks or is Private."}), 404
+            return jsonify({"success": True, "username": (res_pl["playlist"] or {}).get("name", pm.group(1)), "playlists": [res_pl["playlist"]], "tracks": res_pl["tracks"]})
+
+        um = re.search(r"(?:open\.spotify\.com/user/|spotify:user:)([a-zA-Z0-9_.-]+)", user_arg, re.I)
+        uid = (um.group(1) if um else user_arg).split("?")[0].split("#")[0].strip()
+        uid = aliases.get(uid.lower(), uid)
+
+        playlists = []
+        display_name = uid
+        avatar = ""
+        try:
+            ur = req_lib.get(f"https://open.spotify.com/user/{urllib.parse.quote(uid)}", headers={"User-Agent": ua}, timeout=8)
+            if ur.status_code == 200:
+                im = re.search(r'<script[^>]*id="initialState"[^>]*>([\s\S]*?)</script>', ur.text)
+                if im:
+                    st = json.loads(base64.b64decode(im.group(1).strip()).decode("utf-8"))
+                    items = (st.get("entities") or {}).get("items") or {}
+                    ukey = f"spotify:user:{uid}" if f"spotify:user:{uid}" in items else next((k for k in items if k.startswith("spotify:user:")), None)
+                    if ukey:
+                        uobj = items[ukey]
+                        display_name = uobj.get("name") or uid
+                        avs = (uobj.get("avatar") or {}).get("sources") or []
+                        avatar = avs[-1].get("url", "") if avs else ""
+                        for entry in (uobj.get("publicPlaylistsV2") or {}).get("items") or []:
+                            e_uri = entry.get("_uri") or (entry.get("data") or {}).get("uri") or ""
+                            pid = e_uri.split(":")[-1]
+                            if pid:
+                                pdata = entry.get("data") or {}
+                                playlists.append({"id": pid, "name": pdata.get("name", "Public Playlist"), "image": "", "tracks_count": None})
+        except Exception:
+            pass
+
+        if not playlists:
+            return jsonify({"success": False, "error": "Could not find any public playlists for that Spotify username. Make sure your playlists are set to Public on Spotify."}), 404
+
+        top_pls = playlists[:5]
+        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as pool:
+            fetched = list(pool.map(lambda p: fetch_playlist_embed(p["id"]), top_pls))
+
+        hydrated_pls = []
+        all_tracks = []
+        seen = set()
+        for idx, res_pl in enumerate(fetched):
+            if res_pl["tracks"]:
+                pl_info = res_pl["playlist"] or top_pls[idx]
+                hydrated_pls.append(pl_info)
+                for tr in res_pl["tracks"]:
+                    key = tr.get("id") or f"{tr.get('name', '').lower()}::{tr.get('artist', '').lower()}"
+                    if key not in seen:
+                        seen.add(key)
+                        all_tracks.append(tr)
+
+        if not all_tracks:
+            return jsonify({"success": False, "error": "Found playlists, but none had public tracks available."}), 404
+
+        return jsonify({"success": True, "username": display_name, "user_id": uid, "avatar": avatar, "playlists": hydrated_pls, "tracks": all_tracks})
+
+    return jsonify({"success": False, "error": "Provide ?user=, ?playlist=, ?track_preview=, or ?proxy_audio="}), 400
+
 
 # ----------------- Audio Streaming Endpoint -----------------
 

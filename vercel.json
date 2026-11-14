@@ -6,11 +6,15 @@
   "cleanUrls": true,
   "rewrites": [
     {
+      "source": "/api/:match*",
+      "destination": "/api/:match*"
+    },
+    {
       "source": "/login",
       "destination": "/login.html"
     },
     {
-      "source": "/(.*)",
+      "source": "/((?!api/).*)",
       "destination": "/index.html"
     }
   ]

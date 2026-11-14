@@ -18,11 +18,11 @@
 
 ## 1. Executive Summary & High-Level Objective
 - **Project**: Spotiless (Songless — Spotify Edition), an endless music guessing game inspired by *Songless* (Lessgames) with microsecond-accurate snippet intervals (0.1s → 0.25s → 0.5s → 1.0s → 2.0s → 5.0s).
-- **Current Version**: `v1.4.3` (Unified GitHub Cloud & Local Native Release)
+- **Current Version**: `v1.4.4` (Public Spotify Playlists + Multi-Source Waterfall + Niche Auto-Skip Release)
 - **Official Branding**: **Spoti-Less** in-app / **Spotiless** for domain and repository links.
 - **Dual Architecture**:
   1. **Desktop Native Mode (`launcher.py` / `127.0.0.1:4321`)**: 100% Native Spotify Shannon cipher streaming over TCP port 4070 (`ap-gae2.spotify.com:4070`) using cached Librespot playback tokens and personal Spotify user libraries. Works even through school firewalls and FortiGuard blocks.
-  2. **Cloud Standalone Mode (`vercel.json` / `spotiless.vercel.app`)**: 100% decoupled client-side web mode. Users can play independently on mobile or desktop without a local Python daemon. Audio snippets stream via public Apple/iTunes preview CDNs decoded with sample accuracy by the Web Audio API.
+  2. **Cloud Standalone Mode (`vercel.json` / `spotiless.vercel.app`)**: 100% decoupled client-side web mode. Users can paste any Spotify username, profile link, or **Public** playlist link via `/api/spotify_public`, with audio streaming resolved across Spotify Embed MP3 previews, Apple/iTunes, Deezer, CORS audio proxy, and hidden YouTube IFrame fallback. Extremely niche / Spotify-exclusive tracks auto-skip without hurting streaks.
 
 ## 2. Critical Architecture & Invariants
 - **Mandatory GitHub Push Invariant**: Always push commits to GitHub remote immediately upon task completion. Client auto-updaters, deployments (Vercel), and GitHub repo state must always stay synced after every verified feature, fix, or version bump.
@@ -44,14 +44,15 @@
   - Ubiquitous Terms of Service & Privacy Policy modal (`#modal-privacy`) accessible via top navigation shield button (`#btn-nav-privacy`) and footer.
   - Data deletion copy preserved; wipe button earmarked for upcoming Settings menu.
 
-## 3. Recent Modifications & Verified State (`v1.4.3`)
-- [`static/login.html`](file:///d:/DOWNLOAD/RandomSongGuessingThing/static/login.html): Dedicated standalone Sign In, Create Account, and Spotify Connect page (`/login` & `/login.html`) with zero modal overlays, working on both mobile and desktop Vercel deployments.
-- [`vercel.json`](file:///d:/DOWNLOAD/RandomSongGuessingThing/vercel.json) & [`backend/app.py`](file:///d:/DOWNLOAD/RandomSongGuessingThing/backend/app.py): Added `/login` route/rewrite and bumped version to `v1.4.3`.
-- [`static/index.html`](file:///d:/DOWNLOAD/RandomSongGuessingThing/static/index.html) & [`static/app.js`](file:///d:/DOWNLOAD/RandomSongGuessingThing/static/app.js):
-  - Updated `#btn-open-auth` and `window.openAuthModal()` to navigate directly to `login.html`.
-  - Removed auto-popping `#modal-auth` on initial page load so new visitors can play immediately.
-  - Raised `.toast` `z-index` to `10000` and enabled `.modal-card` vertical scrolling in [`static/style.css`](file:///d:/DOWNLOAD/RandomSongGuessingThing/static/style.css).
-  - Bumped asset cache busters to `?v=1.4.3`.
+## 3. Recent Modifications & Verified State (`v1.4.4`)
+- [`api/spotify_public.js`](file:///d:/DOWNLOAD/RandomSongGuessingThing/api/spotify_public.js) & [`backend/app.py`](file:///d:/DOWNLOAD/RandomSongGuessingThing/backend/app.py): Added `/api/spotify_public` endpoint supporting `?user=` (public profile playlists), `?playlist=` (Spotify Embed tracks + previews), `?track_preview=&q=` (Spotify Embed -> iTunes -> Deezer -> YouTube ID waterfall), and CORS-safe `?proxy_audio=`. Bumped version to `v1.4.4`.
+- [`vercel.json`](file:///d:/DOWNLOAD/RandomSongGuessingThing/vercel.json): Configured `/api/:match*` pass-through before `/login` and SPA fallback rewrites.
+- [`static/audio_player.js`](file:///d:/DOWNLOAD/RandomSongGuessingThing/static/audio_player.js): Upgraded `MicroAudioEngine` with 4-stage preview resolution, `/api/spotify_public?proxy_audio=` fallback, Lobby98-style hidden YouTube IFrame Player (`#yt-hidden-player`), and fixed stray bracket syntax bug.
+- [`static/login.html`](file:///d:/DOWNLOAD/RandomSongGuessingThing/static/login.html), [`static/index.html`](file:///d:/DOWNLOAD/RandomSongGuessingThing/static/index.html), & [`static/app.js`](file:///d:/DOWNLOAD/RandomSongGuessingThing/static/app.js):
+  - Added public Spotify username / profile URL / public playlist link loading in both `/login` and `#modal-mode`.
+  - Added clear user warnings reminding users that playlists must be **Public** and explaining that extremely niche / Spotify-exclusive tracks may not exist on web audio platforms.
+  - Added streak-safe auto-skipping (`CloudGameManager.skipUnplayableRound()`) when a niche song fails across all web audio sources, plus Cloud Mode support for public & curated playlists in `#modal-mode`.
+  - Bumped asset cache busters to `?v=1.4.4`.
 
 ## 4. Immediate Next Steps
 - Full unified gameplay verified across both Local Desktop launcher and Cloud Vercel deployment.

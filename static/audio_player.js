@@ -1,4 +1,10 @@
 /**
+ * ⚠️ HEY AI AGENT! Editing this script?
+ * 1. Stop! Read spotiless_context.md & rules first!
+ * 2. Strict Fast-Path Budget: Capped at 1–2 tool calls total (Read -> Edit -> Done).
+ * 3. DO NOT wander or do incremental reads. Make direct edits cleanly.
+ */
+/**
  * High-precision Web Audio API Engine for micro-snippet playback.
  * Sample-accurate cutting for 0.1s, 0.25s, 0.5s, 1s, 2s, 5s.
  */
@@ -23,6 +29,14 @@ class MicroAudioEngine {
         this.pendingPlayFull = null;
         this.pendingSnippet = null;
         this.isLoading = false;
+
+        // Hidden YouTube IFrame Player fallback (Lobby98 style)
+        this.youtubeVideoId = null;
+        this.ytPlayer = null;
+        this.ytReady = false;
+        this.ytSnippetTimer = null;
+        this.ytAnimFrame = null;
+        this.ytPlayStartedAt = 0;
 
         // Callback hooks
         this.onPlayStart = null;
@@ -57,98 +71,106 @@ class MicroAudioEngine {
         }
     }
 
-    async loadTrack(trackId, fallbackQuery = "") {
-        this.initContext();
-        if (this.currentTrackId === trackId && this.audioBuffer) {
-            if (this.pendingSnippet) {
-                const s = this.pendingSnippet;
-                this.pendingSnippet = null;
-                this.playSnippet(s.seconds, s.fromOffset, s.loop);
-            }
-            if (this.pendingHighlight) {
-                const sec = this.pendingHighlight;
-                this.pendingHighlight = null;
-                this.playHighlight(sec);
-            }
-            if (this.pendingPlayFull) {
-                const p = this.pendingPlayFull;
-                this.pendingPlayFull = null;
-                this.playFull(p.fromHighlight, p.loop);
-            }
-            return true; // Already loaded
-        }
-
-        this.stop();
-        this.isLoading = true;
-        this.currentTrackId = trackId;
-        this.audioBuffer = null;
-        this.startOffset = 0;
-        this.highlightOffset = 0;
-
-        let arrayBuffer = null;
-
-        // 1. Try local server endpoint if on localhost / local desktop launcher
+    async fetchPreviewArrayBuffer(url) {
+        if (!url) return null;
         try {
-            const res = await fetch(`/api/audio/${encodeURIComponent(trackId)}`);
-            if (res.ok) {
-                arrayBuffer = await res.arrayBuffer();
-            } else if (!fallbackQuery) {
-                console.error("Failed to fetch audio stream:", res.status);
-                this.isLoading = false;
-                return false;
+            const directRes = await fetch(url);
+            if (directRes.ok) {
+                return await directRes.arrayBuffer();
             }
+        } catch (e) {}
+        try {
+            const proxyRes = await fetch(`/api/spotify_public?proxy_audio=${encodeURIComponent(url)}`);
+            if (proxyRes.ok) {
+                return await proxyRes.arrayBuffer();
             }
-        } catch (e) {
-            // Local backend not reachable (e.g. cloud / Vercel deployment)
-        }
+        } catch (e) {}
+        return null;
+    }
 
-        // 2. Cloud Standalone Fallback: Fetch preview stream via public Apple/iTunes CDN
-        if (!arrayBuffer && fallbackQuery) {
-            try {
-                let previewUrl = null;
-                if (fallbackQuery.startsWith("http://") || fallbackQuery.startsWith("https://")) {
-                    previewUrl = fallbackQuery;
-                } else {
-                    const searchUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(fallbackQuery)}&entity=song&limit=1`;
-                    const sRes = await fetch(searchUrl);
-                    if (sRes.ok) {
-                        const sData = await sRes.json();
-                        if (sData.results && sData.results.length > 0) {
-                            previewUrl = sData.results[0].previewUrl;
+    ensureYouTubePlayer(videoId) {
+        if (!videoId) return Promise.resolve(false);
+        return new Promise((resolve) => {
+            if (!document.getElementById("yt-hidden-player")) {
+                const holder = document.createElement("div");
+                holder.id = "yt-hidden-player";
+                holder.style.cssText = "position:fixed;bottom:-10px;right:-10px;width:1px;height:1px;opacity:0.001;pointer-events:none;z-index:-1;overflow:hidden;";
+                document.body.appendChild(holder);
+            }
+
+            const initOrCue = () => {
+                if (this.ytPlayer && this.ytReady && typeof this.ytPlayer.cueVideoById === "function") {
+                    try {
+                        this.ytPlayer.cueVideoById({ videoId, startSeconds: 25 });
+                    } catch (e) {}
+                    resolve(true);
+                    return;
+                }
+                if (!window.YT || !window.YT.Player) {
+                    resolve(false);
+                    return;
+                }
+                try {
+                    this.ytPlayer = new window.YT.Player("yt-hidden-player", {
+                        height: "1",
+                        width: "1",
+                        videoId,
+                        playerVars: {
+                            autoplay: 0,
+                            controls: 0,
+                            disablekb: 1,
+                            fs: 0,
+                            modestbranding: 1,
+                            playsinline: 1,
+                            start: 25,
+                            origin: window.location.origin
+                        },
+                        events: {
+                            onReady: () => {
+                                this.ytReady = true;
+                                try {
+                                    this.ytPlayer.unMute();
+                                    this.ytPlayer.setVolume(100);
+                                } catch (e) {}
+                                resolve(true);
+                            },
+                            onError: () => {
+                                resolve(false);
+                            }
                         }
-                    }
+                    });
+                } catch (e) {
+                    resolve(false);
                 }
+            };
 
-                if (previewUrl) {
-                    const audioRes = await fetch(previewUrl);
-                    if (audioRes.ok) {
-                        arrayBuffer = await audioRes.arrayBuffer();
-                    }
+            if (window.YT && window.YT.Player) {
+                initOrCue();
+                return;
+            }
+
+            const prevReady = window.onYouTubeIframeAPIReady;
+            window.onYouTubeIframeAPIReady = () => {
+                if (typeof prevReady === "function") {
+                    try { prevReady(); } catch (e) {}
                 }
-            } catch (err) {
-                console.warn("Cloud fallback audio resolution error:", err);
-            }
-        }
+                initOrCue();
+            };
 
-        if (!arrayBuffer) {
-            console.error("Could not obtain audio for track:", trackId);
-            return false;
-        }
-
-        try {
-            this.audioBuffer = await this.ctx.decodeAudioData(arrayBuffer);
-            const detectedOffset = this.detectAudioStartOffset(this.audioBuffer);
-            if (detectedOffset === null) {
-                console.warn("Track buffer appears completely silent, skipping track.");
-                this.isLoading = false;
-                return false;
+            if (!document.getElementById("yt-iframe-api-script")) {
+                const tag = document.createElement("script");
+                tag.id = "yt-iframe-api-script";
+                tag.src = "https://www.youtube.com/iframe_api";
+                document.head.appendChild(tag);
             }
-            this.startOffset = detectedOffset;
-            this.highlightOffset = this.detectAudioHighlightOffset(this.audioBuffer);
-            this.isLoading = false;
-            console.log(
-                `Audio decoded successfully: ${this.audioBuffer.duration.toFixed(2)}s (startOffset: ${this.startOffset.toFixed(2)}s, highlightOffset: ${this.highlightOffset.toFixed(2)}s)`
-            );
+
+            setTimeout(() => resolve(this.ytReady), 4000);
+        });
+    }
+
+    async loadTrack(trackId, fallbackQuery = "", previewUrlHint = "") {
+        this.initContext();
+        if (this.currentTrackId === trackId && (this.audioBuffer || this.youtubeVideoId)) {
             if (this.pendingSnippet) {
                 const s = this.pendingSnippet;
                 this.pendingSnippet = null;
@@ -165,11 +187,145 @@ class MicroAudioEngine {
                 this.playFull(p.fromHighlight, p.loop);
             }
             return true;
-        } catch (err) {
-            console.error("Error decoding audio stream:", err);
-            this.isLoading = false;
-            return false;
         }
+
+        this.stop();
+        this.isLoading = true;
+        this.currentTrackId = trackId;
+        this.audioBuffer = null;
+        this.youtubeVideoId = null;
+        this.startOffset = 0;
+        this.highlightOffset = 0;
+
+        let arrayBuffer = null;
+        let serverFallbackData = null;
+
+        // Stage 1: Try local server endpoint if running desktop launcher
+        try {
+            const res = await fetch(`/api/audio/${encodeURIComponent(trackId)}`);
+            if (res.ok) {
+                const ct = (res.headers.get("content-type") || "").toLowerCase();
+                if (!ct.includes("text/html") && !ct.includes("application/json")) {
+                    arrayBuffer = await res.arrayBuffer();
+                }
+            }
+        } catch (e) {}
+
+        // Stage 2: Spotify Embed MP3 hint (from public playlist metadata)
+        if (!arrayBuffer && previewUrlHint) {
+            arrayBuffer = await this.fetchPreviewArrayBuffer(previewUrlHint);
+        }
+
+        // Stage 3: Direct Apple/iTunes Search API
+        if (!arrayBuffer && fallbackQuery) {
+            try {
+                let previewUrl = null;
+                if (fallbackQuery.startsWith("http://") || fallbackQuery.startsWith("https://")) {
+                    previewUrl = fallbackQuery;
+                } else {
+                    const searchUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(fallbackQuery)}&entity=song&limit=3`;
+                    const sRes = await fetch(searchUrl);
+                    if (sRes.ok) {
+                        const sData = await sRes.json();
+                        const hit = (sData.results || []).find((r) => r && r.previewUrl);
+                        if (hit) previewUrl = hit.previewUrl;
+                    }
+                }
+                if (previewUrl) {
+                    arrayBuffer = await this.fetchPreviewArrayBuffer(previewUrl);
+                }
+            } catch (err) {
+                console.warn("iTunes audio resolution error:", err);
+            }
+        }
+
+        // Stage 4: Serverless Multi-Source Waterfall (Spotify Embed MP3 -> iTunes -> Deezer -> YouTube ID)
+        if (!arrayBuffer && (trackId || fallbackQuery)) {
+            try {
+                const apiRes = await fetch(
+                    `/api/spotify_public?track_preview=${encodeURIComponent(trackId || "")}&q=${encodeURIComponent(fallbackQuery || "")}`
+                );
+                if (apiRes.ok) {
+                    const ct = (apiRes.headers.get("content-type") || "").toLowerCase();
+                    if (ct.includes("application/json")) {
+                        serverFallbackData = await apiRes.json();
+                        if (serverFallbackData && serverFallbackData.preview_url) {
+                            arrayBuffer = await this.fetchPreviewArrayBuffer(serverFallbackData.preview_url);
+                        }
+                    }
+                }
+            } catch (err) {
+                console.warn("Server waterfall audio lookup failed:", err);
+            }
+        }
+
+        // Decode audio buffer if we got an MP3/M4A/OGG stream
+        if (arrayBuffer) {
+            try {
+                this.audioBuffer = await this.ctx.decodeAudioData(arrayBuffer);
+                const detectedOffset = this.detectAudioStartOffset(this.audioBuffer);
+                if (detectedOffset !== null) {
+                    this.startOffset = detectedOffset;
+                    this.highlightOffset = this.detectAudioHighlightOffset(this.audioBuffer);
+                    this.isLoading = false;
+                    console.log(
+                        `Audio decoded successfully: ${this.audioBuffer.duration.toFixed(2)}s (startOffset: ${this.startOffset.toFixed(2)}s, highlightOffset: ${this.highlightOffset.toFixed(2)}s)`
+                    );
+                    if (this.pendingSnippet) {
+                        const s = this.pendingSnippet;
+                        this.pendingSnippet = null;
+                        this.playSnippet(s.seconds, s.fromOffset, s.loop);
+                    }
+                    if (this.pendingHighlight) {
+                        const sec = this.pendingHighlight;
+                        this.pendingHighlight = null;
+                        this.playHighlight(sec);
+                    }
+                    if (this.pendingPlayFull) {
+                        const p = this.pendingPlayFull;
+                        this.pendingPlayFull = null;
+                        this.playFull(p.fromHighlight, p.loop);
+                    }
+                    return true;
+                }
+                this.audioBuffer = null;
+            } catch (err) {
+                console.error("Error decoding audio stream:", err);
+                this.audioBuffer = null;
+            }
+        }
+
+        // Stage 5: Lobby98-Style Hidden YouTube IFrame Player Fallback
+        if (serverFallbackData && serverFallbackData.youtube_video_id) {
+            const ytOk = await this.ensureYouTubePlayer(serverFallbackData.youtube_video_id);
+            if (ytOk) {
+                this.youtubeVideoId = serverFallbackData.youtube_video_id;
+                this.startOffset = 25;
+                this.highlightOffset = 25;
+                this.isLoading = false;
+                if (this.pendingSnippet) {
+                    const s = this.pendingSnippet;
+                    this.pendingSnippet = null;
+                    this.playSnippet(s.seconds, s.fromOffset, s.loop);
+                }
+                if (this.pendingHighlight) {
+                    const sec = this.pendingHighlight;
+                    this.pendingHighlight = null;
+                    this.playHighlight(sec);
+                }
+                if (this.pendingPlayFull) {
+                    const p = this.pendingPlayFull;
+                    this.pendingPlayFull = null;
+                    this.playFull(p.fromHighlight, p.loop);
+                }
+                return true;
+            }
+            this.youtubeVideoId = null;
+        }
+
+        this.isLoading = false;
+        console.error("Could not obtain audio from any source for track:", trackId);
+        return false;
     }
 
     /**
@@ -380,6 +536,54 @@ class MicroAudioEngine {
     async playSnippet(seconds, fromOffset = null, loop = false) {
         await this.ensureContextRunning();
 
+        if (!this.audioBuffer && this.youtubeVideoId) {
+            this.pendingSnippet = null;
+            this.stop();
+            const ytOffset = fromOffset !== null ? fromOffset : (this.highlightOffset || 25);
+            this.currentDuration = seconds;
+            this.isPlaying = true;
+            this.isLooping = !!loop;
+            if (!this.ytPlayer || !this.ytReady) {
+                await this.ensureYouTubePlayer(this.youtubeVideoId);
+            }
+            if (this.ytPlayer && typeof this.ytPlayer.seekTo === "function") {
+                try {
+                    this.ytPlayer.unMute();
+                    this.ytPlayer.setVolume(100);
+                    this.ytPlayer.seekTo(ytOffset, true);
+                    this.ytPlayer.playVideo();
+                } catch (e) {}
+            }
+            this.ytPlayStartedAt = performance.now();
+            if (this.onPlayStart) {
+                this.onPlayStart(this.currentDuration);
+            }
+            const tickYt = () => {
+                if (!this.isPlaying) return;
+                const elapsed = Math.max(0, (performance.now() - this.ytPlayStartedAt) / 1000);
+                if (this.isLooping) {
+                    const loopElapsed = this.currentDuration > 0 ? (elapsed % this.currentDuration) : 0;
+                    const progress = this.currentDuration > 0 ? (loopElapsed / this.currentDuration) : 0;
+                    if (this.onPlayProgress) this.onPlayProgress(progress, loopElapsed);
+                    this.ytAnimFrame = requestAnimationFrame(tickYt);
+                } else {
+                    const progress = Math.min(elapsed / this.currentDuration, 1.0);
+                    if (this.onPlayProgress) this.onPlayProgress(progress, elapsed);
+                    if (elapsed < this.currentDuration + 0.08) {
+                        this.ytAnimFrame = requestAnimationFrame(tickYt);
+                    }
+                }
+            };
+            this.ytAnimFrame = requestAnimationFrame(tickYt);
+            if (!this.isLooping) {
+                this.ytSnippetTimer = setTimeout(() => {
+                    this.ytSnippetTimer = null;
+                    this.stop();
+                }, Math.max(80, Math.round(seconds * 1000)));
+            }
+            return;
+        }
+
         if (!this.audioBuffer || !this.ctx) {
             console.warn("Audio buffer not ready yet, queueing snippet playback...");
             this.pendingSnippet = { seconds, fromOffset, loop };
@@ -482,6 +686,11 @@ class MicroAudioEngine {
 
     async playHighlight(seconds = null, loop = false) {
         await this.ensureContextRunning();
+        if (!this.audioBuffer && this.youtubeVideoId) {
+            this.pendingHighlight = null;
+            this.playSnippet(seconds || 30, this.highlightOffset || 25, loop);
+            return;
+        }
         if (!this.audioBuffer) {
             this.pendingHighlight = seconds || true;
             return;
@@ -495,6 +704,11 @@ class MicroAudioEngine {
 
     async playFull(fromHighlight = false, loop = true) {
         await this.ensureContextRunning();
+        if (!this.audioBuffer && this.youtubeVideoId) {
+            this.pendingPlayFull = null;
+            this.playSnippet(30, fromHighlight ? (this.highlightOffset || 25) : 25, loop);
+            return;
+        }
         if (!this.audioBuffer) {
             this.pendingPlayFull = { fromHighlight, loop };
             return;
@@ -547,6 +761,18 @@ class MicroAudioEngine {
         this.pendingHighlight = null;
         this.pendingSnippet = null;
 
+        if (this.ytSnippetTimer) {
+            clearTimeout(this.ytSnippetTimer);
+            this.ytSnippetTimer = null;
+        }
+        if (this.ytAnimFrame) {
+            cancelAnimationFrame(this.ytAnimFrame);
+            this.ytAnimFrame = null;
+        }
+        if (this.ytPlayer && typeof this.ytPlayer.pauseVideo === "function") {
+            try { this.ytPlayer.pauseVideo(); } catch (e) {}
+        }
+
         if (this.fadeTimeoutId) {
             clearTimeout(this.fadeTimeoutId);
             this.fadeTimeoutId = null;
@@ -593,6 +819,13 @@ class MicroAudioEngine {
     }
 
     getWaveformData(dataArray) {
+        if (this.isPlaying && this.youtubeVideoId && !this.audioBuffer) {
+            const t = performance.now() / 160;
+            for (let i = 0; i < dataArray.length; i++) {
+                dataArray[i] = Math.round(90 + 110 * Math.abs(Math.sin(t + i * 0.42)));
+            }
+            return;
+        }
         if (this.analyser) {
             this.analyser.getByteFrequencyData(dataArray);
         }

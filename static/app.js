@@ -347,19 +347,65 @@ document.addEventListener("DOMContentLoaded", () => {
     async function handleSpotifyLinkInput(rawInput, inputEl) {
         const raw = (rawInput || "").trim();
         if (!raw) {
-            showToast("Paste a Spotify playlist link or your sp_dc cookie.");
+            showToast("Paste a Spotify username, profile link, or public playlist link.");
             if (inputEl) inputEl.focus();
             return;
         }
 
-        // Support Spotify Playlist URL or URI on both Mobile and PC
+        // Support Spotify Playlist URL/URI or Public Username / Profile URL
         const playlistMatch = raw.match(/(?:open\.spotify\.com\/playlist\/|spotify:playlist:)([a-zA-Z0-9]+)/i);
-        if (playlistMatch) {
-            const playlistId = playlistMatch[1];
-            localStorage.setItem("spotiless_linked_playlist", playlistId);
-            if (inputEl) inputEl.value = "";
+        const looksLikeCookie = /^sp_dc=/i.test(raw) || (raw.length > 60 && !raw.includes("/") && !raw.includes("spotify:") && !raw.includes(" "));
 
-            if (!isCloudMode) {
+        if (!looksLikeCookie) {
+            if (isCloudMode) {
+                showToast(playlistMatch ? "Loading public playlist tracks..." : "Scanning public Spotify playlists...", 3500);
+                try {
+                    const param = playlistMatch
+                        ? `playlist=${encodeURIComponent(raw)}`
+                        : `user=${encodeURIComponent(raw)}`;
+                    const res = await fetch(`/api/spotify_public?${param}`);
+                    const data = await res.json();
+                    if (!res.ok || !data.success || !Array.isArray(data.tracks) || !data.tracks.length) {
+                        showToast((data && data.error) || "Could not load tracks. Make sure playlists are set to Public on Spotify!", 4500);
+                        return;
+                    }
+
+                    if (Array.isArray(data.playlists) && data.playlists.length) {
+                        try {
+                            localStorage.setItem("spotiless_public_playlists", JSON.stringify(data.playlists));
+                        } catch (e) {}
+                        cachedUserPlaylists = data.playlists;
+                    }
+                    if (!playlistMatch) {
+                        try {
+                            localStorage.setItem("spotiless_linked_user", data.user_id || data.username || raw);
+                        } catch (e) {}
+                    } else {
+                        try {
+                            localStorage.setItem("spotiless_linked_playlist", playlistMatch[1]);
+                        } catch (e) {}
+                    }
+
+                    const poolLabel = playlistMatch
+                        ? `🎵 ${(data.playlist && data.playlist.name) || "Spotify Playlist"}`
+                        : `🎵 ${data.username || raw}'s Public Playlists`;
+                    const newState = CloudGameManager.loadCustomPool(data.tracks, poolLabel);
+                    consecutiveAutoSkips = 0;
+                    if (inputEl) inputEl.value = "";
+                    closeModals();
+                    applyGameState(newState);
+                    refreshStatus();
+                    showToast(`Loaded ${data.tracks.length} songs! ⚠️ Niche/Spotify-exclusive tracks auto-skip without hurting your streak.`, 4500);
+                    return;
+                } catch (err) {
+                    console.warn("Public Spotify load failed:", err);
+                    showToast("Network error loading Spotify public data. Please try again.", 3500);
+                    return;
+                }
+            } else if (playlistMatch) {
+                const playlistId = playlistMatch[1];
+                localStorage.setItem("spotiless_linked_playlist", playlistId);
+                if (inputEl) inputEl.value = "";
                 try {
                     const res = await fetch("/api/playlists/load_custom", {
                         method: "POST",
@@ -377,11 +423,10 @@ document.addEventListener("DOMContentLoaded", () => {
                 } catch (err) {
                     console.warn("Local playlist load failed:", err);
                 }
+                checkAccountState();
+                showToast("Spotify playlist saved! Load it from the Playlists menu.");
+                return;
             }
-
-            checkAccountState();
-            showToast("Spotify playlist saved! Tap Start Playing Now to play Cloud Top Hits.");
-            return;
         }
 
         // Otherwise treat as sp_dc cookie
@@ -513,6 +558,13 @@ document.addEventListener("DOMContentLoaded", () => {
                 localStorage.removeItem("spotiless_sp_dc");
                 localStorage.removeItem("sp_dc");
                 localStorage.removeItem("spotiless_linked_playlist");
+                localStorage.removeItem("spotiless_linked_user");
+                localStorage.removeItem("spotiless_public_playlists");
+                if (isCloudMode && typeof CloudGameManager !== "undefined") {
+                    const st = CloudGameManager.resetToDefaultPool();
+                    applyGameState(st);
+                    refreshStatus();
+                }
                 const acc = getStoredAccount();
                 renderAccountConnectedView((acc && acc.username) || "Player", false);
                 checkAccountState();
@@ -532,6 +584,10 @@ document.addEventListener("DOMContentLoaded", () => {
                 localStorage.removeItem("spotiless_sp_dc");
                 localStorage.removeItem("sp_dc");
                 localStorage.removeItem("spotiless_linked_playlist");
+                localStorage.removeItem("spotiless_linked_user");
+                localStorage.removeItem("spotiless_public_playlists");
+                localStorage.removeItem("spotiless_custom_cloud_tracks");
+                localStorage.removeItem("spotiless_custom_pool_name");
                 sessionStorage.removeItem("spotiless_guest_session");
 
                 if (!isCloudMode) {
@@ -582,8 +638,12 @@ document.addEventListener("DOMContentLoaded", () => {
     let isCloudMode = false;
 
     // ----------------- Cloud Standalone Mode Engine -----------------
+    let consecutiveAutoSkips = 0;
+
     const CloudGameManager = {
+        defaultTracks: [],
         tracks: [],
+        poolName: "🔥 Spoti-Less Top Hits (Cloud)",
         currentIndex: 0,
         stages: [0.1, 0.25, 0.5, 1.0, 2.0, 5.0],
         attemptIndex: 0,
@@ -602,10 +662,27 @@ document.addEventListener("DOMContentLoaded", () => {
             try {
                 const res = await fetch("cloud_tracks.json");
                 if (res.ok) {
-                    this.tracks = await res.json();
+                    this.defaultTracks = await res.json();
                 }
             } catch (e) {
                 console.warn("Failed to load cloud_tracks.json:", e);
+            }
+
+            this.tracks = Array.isArray(this.defaultTracks) ? [...this.defaultTracks] : [];
+            this.poolName = "🔥 Spoti-Less Top Hits (Cloud)";
+
+            try {
+                const customRaw = localStorage.getItem("spotiless_custom_cloud_tracks");
+                const customName = localStorage.getItem("spotiless_custom_pool_name");
+                if (customRaw) {
+                    const parsed = JSON.parse(customRaw);
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        this.tracks = parsed;
+                        this.poolName = customName || `🎵 Custom Playlist (${parsed.length} tracks)`;
+                    }
+                }
+            } catch (e) {
+                console.warn("Failed to load custom cloud tracks:", e);
             }
 
             try {
@@ -619,6 +696,49 @@ document.addEventListener("DOMContentLoaded", () => {
             } catch (e) {}
 
             this.resetRound();
+        },
+
+        loadCustomPool: function(tracks, poolName, persist = true) {
+            if (!Array.isArray(tracks) || !tracks.length) return this.getState();
+            const shuffled = [...tracks];
+            for (let i = shuffled.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+            }
+            this.tracks = shuffled;
+            this.poolName = poolName || `🎵 Custom Playlist (${shuffled.length} tracks)`;
+            this.currentIndex = 0;
+            this.resetRound();
+            this.saveStats();
+            if (persist) {
+                try {
+                    localStorage.setItem("spotiless_custom_cloud_tracks", JSON.stringify(shuffled));
+                    localStorage.setItem("spotiless_custom_pool_name", this.poolName);
+                } catch (e) {}
+            }
+            return this.getState();
+        },
+
+        resetToDefaultPool: function() {
+            this.tracks = Array.isArray(this.defaultTracks) ? [...this.defaultTracks] : [];
+            this.poolName = "🔥 Spoti-Less Top Hits (Cloud)";
+            this.currentIndex = 0;
+            this.resetRound();
+            this.saveStats();
+            try {
+                localStorage.removeItem("spotiless_custom_cloud_tracks");
+                localStorage.removeItem("spotiless_custom_pool_name");
+            } catch (e) {}
+            return this.getState();
+        },
+
+        skipUnplayableRound: function() {
+            // Skip unplayable niche/Spotify-exclusive track without hurting win streak
+            if (!this.tracks.length) return this.getState();
+            this.currentIndex = (this.currentIndex + 1) % this.tracks.length;
+            this.resetRound();
+            this.saveStats();
+            return this.getState();
         },
 
         saveStats: function() {
@@ -656,12 +776,13 @@ document.addEventListener("DOMContentLoaded", () => {
                 guesses: this.guesses,
                 is_won: this.isWon,
                 is_over: this.isOver,
-                pool_name: "🔥 Spoti-Less Top Hits (Cloud)",
+                pool_name: this.poolName || "🔥 Spoti-Less Top Hits (Cloud)",
                 total_songs: total,
                 song_index: songIdx,
                 session_won: this.stats.won,
                 session_played: this.stats.played,
-                preview_query: track ? `${track.artist} ${track.name}` : ""
+                preview_query: track ? `${track.artist} ${track.name}` : "",
+                preview_url: track ? (track.preview_url || "") : ""
             };
 
             if (this.isOver && track) {
@@ -1040,19 +1161,39 @@ document.addEventListener("DOMContentLoaded", () => {
     function checkAccountState() {
         const acc = getStoredAccount();
         const cookie = getSpotifyCookie();
-        const guest = sessionStorage.getItem("spotiless_guest_session");
-        const userPlaylistsStatusMsg = document.getElementById("user-playlists-status-msg");
+        const linkedUser = localStorage.getItem("spotiless_linked_user");
+        let publicPlaylists = [];
+        try {
+            const rawPl = localStorage.getItem("spotiless_public_playlists");
+            if (rawPl) {
+                const parsedPl = JSON.parse(rawPl);
+                if (Array.isArray(parsedPl)) publicPlaylists = parsedPl;
+            }
+        } catch (e) {}
 
-        if (cookie) {
+        const userPlaylistsStatusMsg = document.getElementById("user-playlists-status-msg");
+        if (isCloudMode && userPlaylistsGrid) {
+            if (publicPlaylists.length > 0) {
+                cachedUserPlaylists = publicPlaylists;
+                renderUserPlaylists(cachedUserPlaylists);
+                updateMultiPlaylistBar();
+            } else if (cookie || linkedUser) {
+                userPlaylistsGrid.innerHTML = '<div class="empty-playlists-note" id="user-playlists-status-msg" style="padding: 16px 12px; text-align: center;"><p style="margin: 0 0 6px 0; font-weight: 700; color: #fff; font-size: 0.9rem;">Spotify Linked 🎵</p><p style="margin: 0 0 12px 0; font-size: 0.8rem; color: var(--color-text-muted);">Paste your Spotify username or any <strong>Public</strong> playlist link above to load songs instantly.</p></div>';
+            } else {
+                userPlaylistsGrid.innerHTML = '<div class="empty-playlists-note" id="user-playlists-status-msg" style="padding: 16px 12px; text-align: center;"><p style="margin: 0 0 6px 0; font-weight: 700; color: #fff; font-size: 0.9rem;">No Public Spotify Profile Linked</p><p style="margin: 0 0 12px 0; font-size: 0.8rem; color: var(--color-text-muted);">Paste your Spotify username above (playlists must be set to <strong>Public</strong>) or connect on the Spotify Connect page.</p><button type="button" class="btn btn-primary btn-sm" onclick="window.location.href=\'login.html\'" style="font-weight: 800; font-size: 0.8rem;">🔗 Connect Spotify Account</button></div>';
+            }
+        } else if (cookie || linkedUser) {
             if (userPlaylistsStatusMsg) {
-                userPlaylistsStatusMsg.innerHTML = '<p style="margin: 0 0 6px 0; font-weight: 700; color: #fff; font-size: 0.9rem;">Spotify Linked 🍪</p><p style="margin: 0 0 12px 0; font-size: 0.8rem; color: var(--color-text-muted);">Paste any playlist URL above to load songs instantly, or run desktop native mode to sync your created playlists.</p>';
+                userPlaylistsStatusMsg.innerHTML = '<p style="margin: 0 0 6px 0; font-weight: 700; color: #fff; font-size: 0.9rem;">Spotify Linked 🎵</p><p style="margin: 0 0 12px 0; font-size: 0.8rem; color: var(--color-text-muted);">Paste any public playlist URL above to load songs instantly.</p>';
             }
         } else if (userPlaylistsStatusMsg) {
-            userPlaylistsStatusMsg.innerHTML = '<p style="margin: 0 0 6px 0; font-weight: 700; color: #fff; font-size: 0.9rem;">No Spotify Account Linked</p><p style="margin: 0 0 12px 0; font-size: 0.8rem; color: var(--color-text-muted);">Connect your Spotify account to load and play your personal playlists here.</p><button type="button" class="btn btn-primary btn-sm" onclick="window.location.href=\'login.html\'" style="font-weight: 800; font-size: 0.8rem;">🔗 Connect Spotify Account</button>';
+            userPlaylistsStatusMsg.innerHTML = '<p style="margin: 0 0 6px 0; font-weight: 700; color: #fff; font-size: 0.9rem;">No Spotify Account Linked</p><p style="margin: 0 0 12px 0; font-size: 0.8rem; color: var(--color-text-muted);">Connect your Spotify account to load and play your public playlists here.</p><button type="button" class="btn btn-primary btn-sm" onclick="window.location.href=\'login.html\'" style="font-weight: 800; font-size: 0.8rem;">🔗 Connect Spotify Account</button>';
         }
 
         if (acc && acc.username) {
-            renderAccountConnectedView(acc.username, !!cookie);
+            renderAccountConnectedView(acc.username, Boolean(cookie || linkedUser));
+        } else if (linkedUser) {
+            renderAccountConnectedView(linkedUser, true);
         } else if (cookie) {
             renderAccountConnectedView("Spotify Cookie User", true);
         } else {
@@ -1075,7 +1216,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (isCloudMode) {
             checkAccountState();
             streakCounter.textContent = CloudGameManager.stats.current_streak || 0;
-            activePoolLabel.textContent = "🔥 Spoti-Less Hits";
+            activePoolLabel.textContent = CloudGameManager.poolName || "🔥 Spoti-Less Hits";
             if (navCounterPill) {
                 const total = CloudGameManager.tracks.length || 1;
                 const idx = (CloudGameManager.currentIndex % total) + 1;
@@ -1147,13 +1288,33 @@ document.addEventListener("DOMContentLoaded", () => {
         currentRound = state;
         if (!state || !state.active) return;
 
-        // Preload audio into memory buffer
+        // Preload audio into memory buffer (or YouTube IFrame fallback)
         showSpinner(true);
         const audioFallback = state.solution ? `${state.solution.artist} ${state.solution.name}` : (state.preview_query || "");
-        audio.loadTrack(state.round_id, audioFallback).then((ok) => {
+        const previewUrlHint = state.preview_url || (state.solution && state.solution.preview_url) || "";
+        const expectedRoundId = state.round_id;
+        audio.loadTrack(state.round_id, audioFallback, previewUrlHint).then((ok) => {
             showSpinner(false);
-            if (!ok) {
-                console.warn("Audio snippet preview unavailable or waiting for interaction:", state.round_id);
+            if (currentRound && currentRound.round_id !== expectedRoundId) return;
+            if (ok) {
+                consecutiveAutoSkips = 0;
+                return;
+            }
+            console.warn("Audio snippet preview unavailable on all web sources:", state.round_id, audioFallback);
+            if (isCloudMode && !state.is_over && CloudGameManager.tracks.length > 1) {
+                const trackLabel = audioFallback || "This niche track";
+                if (consecutiveAutoSkips < 5) {
+                    consecutiveAutoSkips++;
+                    showToast(`⚠️ "${trackLabel}" isn't available on web sources (too niche / Spotify-exclusive) — skipping (streak safe!)`, 4000);
+                    setTimeout(() => {
+                        if (!currentRound || currentRound.round_id !== expectedRoundId || currentRound.is_over) return;
+                        const nextState = CloudGameManager.skipUnplayableRound();
+                        applyGameState(nextState);
+                        refreshStatus();
+                    }, 700);
+                } else {
+                    showToast("⚠️ Multiple niche songs couldn't play on web sources — try switching to another public playlist or Top Hits!", 4500);
+                }
             }
         });
 
@@ -1634,11 +1795,22 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
+    const CLOUD_CURATED_PLAYLISTS = [
+        { id: "__cloud_top_hits__", name: "🔥 Spoti-Less Top Hits (Built-in)", desc: "Instant playable web hits (zero rate limits)", image: "" },
+        { id: "37i9dQZF1DXcBWIGoYBM5M", name: "🌟 Today's Top Hits", desc: "The biggest pop & viral hits on Spotify", image: "https://i.scdn.co/image/ab67706f00000002b0fe40a6e1692822f5a9d8f1" },
+        { id: "37i9dQZF1DX4o1oenSJRJd", name: "🪩 2000s Pop Throwbacks", desc: "Nostalgic 2000s pop anthems", image: "https://i.scdn.co/image/ab67706f000000021665e8a719bd183f044bb775" },
+        { id: "37i9dQZF1DX0XUsuxWHRQd", name: "🎧 RapCaviar", desc: "Top hip-hop & rap tracks", image: "https://i.scdn.co/image/ab67706f00000002ca5a7517156021292e5663a6" },
+        { id: "37i9dQZF1DWXRqgorJj26U", name: "🎸 Rock Classics", desc: "Timeless rock & alternative classics", image: "https://i.scdn.co/image/ab67706f00000002fe24d7084be4aa228871629b" },
+        { id: "37i9dQZF1DXbTxeAdrVG2l", name: "📻 90s Hits", desc: "Iconic 90s music across all genres", image: "https://i.scdn.co/image/ab67706f0000000234d8ee34bc819e62fe8971f4" }
+    ];
+
     async function openModeModal() {
         if (!modalMode) return;
         modalMode.classList.remove("hidden");
         if (isCloudMode) {
             checkAccountState();
+            renderCuratedPlaylists(CLOUD_CURATED_PLAYLISTS);
+            updateMultiPlaylistBar();
             return;
         }
         try {
@@ -1656,6 +1828,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
     difficultyCards.forEach(card => {
         card.addEventListener("click", async () => {
+            if (isCloudMode) {
+                showToast("Personal rotation & Liked Songs require Desktop Native mode — in Cloud Mode, play Top Hits or any Public Playlist below!", 3500);
+                return;
+            }
             const mode = card.dataset.mode;
             selectedPlaylists.clear();
             updateMultiPlaylistBar();
@@ -1681,10 +1857,18 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     });
 
+    function buildPlaylistCoverMarkup(imageUrl, fallbackIcon = "🎵") {
+        if (imageUrl) {
+            return `<img src="${imageUrl}" alt="Cover" onerror="this.style.display='none'">`;
+        }
+        return `<div style="width: 48px; height: 48px; border-radius: 6px; background: rgba(29, 185, 84, 0.16); display: flex; align-items: center; justify-content: center; font-size: 1.35rem; flex-shrink: 0;">${fallbackIcon}</div>`;
+    }
+
     function renderUserPlaylists(playlists) {
+        if (!userPlaylistsGrid) return;
         userPlaylistsGrid.innerHTML = "";
         if (!playlists.length) {
-            userPlaylistsGrid.innerHTML = `<div class="empty-playlists-note">No playlists created by you found in your account yet.</div>`;
+            userPlaylistsGrid.innerHTML = `<div class="empty-playlists-note">No playlists created by you found in your account yet. Make sure your playlists are set to <strong>Public</strong>.</div>`;
             return;
         }
 
@@ -1693,10 +1877,10 @@ document.addEventListener("DOMContentLoaded", () => {
             card.className = "playlist-card" + (selectedPlaylists.has(p.id) ? " selected" : "");
             card.setAttribute("data-playlist-id", p.id);
             card.innerHTML = `
-                <img src="${p.image || ''}" alt="Cover">
+                ${buildPlaylistCoverMarkup(p.image, "🎵")}
                 <div class="p-info">
                     <div class="p-title">${p.name}</div>
-                    <div class="p-count">${p.tracks_count} tracks • By you</div>
+                    <div class="p-count">${p.tracks_count} tracks • Public</div>
                 </div>
                 <div class="p-check">✓</div>
             `;
@@ -1720,7 +1904,7 @@ document.addEventListener("DOMContentLoaded", () => {
             card.className = "playlist-card" + (selectedPlaylists.has(p.id) ? " selected" : "");
             card.setAttribute("data-playlist-id", p.id);
             card.innerHTML = `
-                <img src="${p.image || ''}" alt="Cover">
+                ${buildPlaylistCoverMarkup(p.image, "🔥")}
                 <div class="p-info">
                     <div class="p-title">${p.name}</div>
                     <div class="p-count">${p.desc}</div>
@@ -1744,6 +1928,58 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!ids.length) return;
         showSpinner(true);
         try {
+            if (isCloudMode) {
+                const includesBuiltInTopHits = ids.includes("__cloud_top_hits__");
+                const externalIds = ids.filter(id => id !== "__cloud_top_hits__");
+
+                if (includesBuiltInTopHits && externalIds.length === 0) {
+                    const st = CloudGameManager.resetToDefaultPool();
+                    consecutiveAutoSkips = 0;
+                    closeModals();
+                    applyGameState(st);
+                    refreshStatus();
+                    showToast("Switched to Spoti-Less Top Hits! 🔥");
+                    return;
+                }
+
+                const fetchedResults = await Promise.allSettled(
+                    externalIds.map(id => fetch(`/api/spotify_public?playlist=${encodeURIComponent(id)}`).then(r => r.json()))
+                );
+
+                const mergedTracks = includesBuiltInTopHits && Array.isArray(CloudGameManager.defaultTracks)
+                    ? [...CloudGameManager.defaultTracks]
+                    : [];
+                const seenKeys = new Set(mergedTracks.map(t => t.id || `${t.name}::${t.artist}`.toLowerCase()));
+                let loadedPlaylistCount = includesBuiltInTopHits ? 1 : 0;
+
+                fetchedResults.forEach(res => {
+                    if (res.status === "fulfilled" && res.value && res.value.success && Array.isArray(res.value.tracks)) {
+                        loadedPlaylistCount++;
+                        res.value.tracks.forEach(t => {
+                            const key = t.id || `${t.name}::${t.artist}`.toLowerCase();
+                            if (!seenKeys.has(key)) {
+                                seenKeys.add(key);
+                                mergedTracks.push(t);
+                            }
+                        });
+                    }
+                });
+
+                if (!mergedTracks.length) {
+                    showToast("Could not load tracks from selected playlists. Make sure they are Public on Spotify!", 4000);
+                    return;
+                }
+
+                const poolLabel = names.length === 1 ? `🎵 ${names[0]}` : `🎵 ${loadedPlaylistCount} Mixed Playlists`;
+                const newState = CloudGameManager.loadCustomPool(mergedTracks, poolLabel);
+                consecutiveAutoSkips = 0;
+                closeModals();
+                applyGameState(newState);
+                refreshStatus();
+                showToast(`Playing ${mergedTracks.length} songs from ${names.join(" + ")}! ⚠️ Niche tracks auto-skip safely.`, 4000);
+                return;
+            }
+
             const res = await fetch("/api/game/pool", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -1768,7 +2004,7 @@ document.addEventListener("DOMContentLoaded", () => {
             showToast(`Playing from ${label}${total}!`);
         } catch (err) {
             console.error("Failed to load selected playlists:", err);
-            alert("Error loading playlists: " + err);
+            showToast("Error loading playlists: " + err.message, 3500);
         } finally {
             showSpinner(false);
         }
@@ -1788,7 +2024,14 @@ document.addEventListener("DOMContentLoaded", () => {
             const val = inputCustom.value.trim();
             if (!val) return;
             if (isCloudMode) {
-                await handleSpotifyLinkInput(val, inputCustom);
+                btnLoadCustom.disabled = true;
+                btnLoadCustom.textContent = "Loading...";
+                try {
+                    await handleSpotifyLinkInput(val, inputCustom);
+                } finally {
+                    btnLoadCustom.disabled = false;
+                    btnLoadCustom.textContent = "Load & Play";
+                }
                 return;
             }
             btnLoadCustom.disabled = true;
@@ -1908,10 +2151,14 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     });
 
-    function showToast(msg) {
+    function showToast(msg, durationMs = 2500) {
+        if (!toast) return;
         toast.textContent = msg;
         toast.classList.remove("hidden");
-        setTimeout(() => toast.classList.add("hidden"), 2500);
+        if (showToast._timer) {
+            clearTimeout(showToast._timer);
+        }
+        showToast._timer = setTimeout(() => toast.classList.add("hidden"), durationMs);
     }
 
     // ----------------- Global Event Listeners -----------------

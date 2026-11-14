@@ -22,7 +22,7 @@
             } catch (e) {}
         })();
     </script>
-    <link rel="stylesheet" href="style.css?v=1.4.3">
+    <link rel="stylesheet" href="style.css?v=1.4.4">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400..800;1,9..40,400..800&family=Poppins:wght@600;700;800;900&display=swap" rel="stylesheet">
@@ -231,8 +231,8 @@
                     </div>
 
                     <div>
-                        <label class="login-field-label" for="login-spotify-input">Spotify Playlist Link or <code>sp_dc</code> Cookie <span style="font-weight: 400; color: var(--color-text-subtle);">(optional)</span></label>
-                        <input type="text" id="login-spotify-input" class="login-input" placeholder="Paste open.spotify.com/playlist/... or sp_dc cookie">
+                        <label class="login-field-label" for="login-spotify-input">Spotify Username or Public Playlist Link <span style="font-weight: 400; color: var(--color-text-subtle);">(optional — playlists must be Public)</span></label>
+                        <input type="text" id="login-spotify-input" class="login-input" placeholder="e.g. cole.__ or open.spotify.com/playlist/...">
                     </div>
 
                     <div class="btn-row-stack">
@@ -248,17 +248,24 @@
 
             <!-- Connect Spotify Card (Mobile & PC) -->
             <section id="spotify-connect-card" class="login-card">
-                <h2>&#127925; Connect Spotify (Mobile &amp; PC)</h2>
+                <h2>&#127925; Connect Spotify via Username or Playlist (Mobile &amp; PC)</h2>
                 <p class="subtitle">
-                    Paste any Spotify playlist link from your phone or PC, or paste your <code>sp_dc</code> cookie from desktop Chrome/Edge.
+                    Just paste your <strong>Spotify username</strong>, <strong>profile link</strong>, or any <strong>public playlist link</strong> — no password or cookie needed! <strong>Note:</strong> Your playlists must be set to <strong>Public</strong> on Spotify.
                 </p>
+
+                <div style="background: rgba(255, 170, 0, 0.12); border: 1px solid rgba(255, 170, 0, 0.35); border-radius: var(--radius-sm); padding: 10px 12px; margin-bottom: 12px; font-size: 0.78rem; color: #ffd27d; line-height: 1.45;">
+                    <strong>&#9888;&#65039; Heads up on Niche / Spotify-Exclusive Songs:</strong> On the web, Spoti-Less plays your songs using Spotify Previews, iTunes, Deezer, and YouTube. If an extremely niche or Spotify-exclusive track isn&apos;t available on any web source, Spoti-Less will warn you and auto-skip to the next song without hurting your streak!
+                </div>
 
                 <div id="spotify-status-msg" class="login-status-banner hidden"></div>
 
                 <div style="display: flex; flex-direction: column; gap: 10px;">
-                    <input type="text" id="spotify-link-field" class="login-input" placeholder="https://open.spotify.com/playlist/... or sp_dc cookie">
+                    <input type="text" id="spotify-link-field" class="login-input" placeholder="Spotify username (e.g. cole.__) or playlist link">
                     <button type="button" id="btn-link-spotify-play" class="btn btn-primary btn-full" onclick="connectSpotifyAndPlay()" style="font-weight: 800;">
-                        &#127925; Link Spotify &amp; Play
+                        &#127925; Load Public Playlists &amp; Play
+                    </button>
+                    <button type="button" id="btn-reset-top-hits" class="btn btn-secondary btn-full hidden" onclick="resetToTopHitsOnPage()">
+                        &#128293; Switch Back to Cloud Top Hits
                     </button>
                     <button type="button" id="btn-unlink-spotify-page" class="btn btn-secondary btn-full hidden" onclick="unlinkSpotifyOnPage()" style="color: #ff6b6b;">
                         Unlink Spotify
@@ -266,10 +273,11 @@
                 </div>
 
                 <details style="margin-top: 12px; font-size: 0.78rem; color: var(--color-text-muted); background: var(--bg-surface-elevated); border-radius: var(--radius-sm); padding: 10px 12px; border: 1px solid var(--border-color);">
-                    <summary style="cursor: pointer; font-weight: 700; color: var(--color-spotify);">How to copy a playlist link or sp_dc cookie?</summary>
+                    <summary style="cursor: pointer; font-weight: 700; color: var(--color-spotify);">How to make a playlist Public or copy your Spotify link?</summary>
                     <ol style="margin: 8px 0 0 18px; padding: 0; line-height: 1.55;">
-                        <li><strong>Mobile &amp; PC (Playlist Link):</strong> Open Spotify &rarr; go to a playlist &rarr; tap <strong>Share &rarr; Copy Link</strong>, then paste it above. <em>(Note: Live personal Spotify streaming runs on the Desktop Native app; the Vercel web site plays Cloud Top Hits.)</em></li>
-                        <li><strong>PC Desktop (<code>sp_dc</code> Cookie):</strong> Sign in at <a href="https://open.spotify.com" target="_blank" rel="noopener noreferrer" style="color: var(--color-spotify); text-decoration: underline;">open.spotify.com</a>, press <kbd>F12</kbd> &rarr; <strong>Application &gt; Cookies</strong> &rarr; copy <code>sp_dc</code>.</li>
+                        <li><strong>Username / Profile Link:</strong> Open Spotify &rarr; Profile &rarr; tap <strong>Share &rarr; Copy Link</strong> (or type your username/ID), and make sure the playlists you want to play are set to <strong>Public</strong> (<em>Add to profile</em>).</li>
+                        <li><strong>Single Playlist Link:</strong> Open any public playlist &rarr; tap <strong>Share &rarr; Copy Link</strong> and paste it above.</li>
+                        <li><strong>PC Desktop (<code>sp_dc</code> Cookie):</strong> Optional for local desktop app &mdash; sign in at <a href="https://open.spotify.com" target="_blank" rel="noopener noreferrer" style="color: var(--color-spotify); text-decoration: underline;">open.spotify.com</a>, press <kbd>F12</kbd> &rarr; <strong>Application &gt; Cookies</strong> &rarr; copy <code>sp_dc</code>.</li>
                     </ol>
                 </details>
             </section>
@@ -337,31 +345,64 @@
                 return localStorage.getItem("spotiless_sp_dc") || localStorage.getItem("sp_dc") || "";
             }
 
-            function saveSpotifyInput(raw) {
+            async function loadPublicSpotify(raw) {
                 const trimmed = (raw || "").trim();
-                if (!trimmed) return false;
-                const playlistMatch = trimmed.match(/(?:open\.spotify\.com\/playlist\/|spotify:playlist:)([a-zA-Z0-9]+)/i);
-                if (playlistMatch) {
-                    localStorage.setItem("spotiless_linked_playlist", playlistMatch[1]);
-                    return "playlist";
+                if (!trimmed) return { ok: false, error: "Please enter a Spotify username or public playlist link." };
+
+                // Check if user pasted a raw sp_dc cookie token
+                if (/^sp_dc=/i.test(trimmed) || (trimmed.length > 60 && !trimmed.includes("http") && !trimmed.includes("spotify:") && !trimmed.includes(" "))) {
+                    const cookieMatch = trimmed.match(/sp_dc=([a-zA-Z0-9_\-]+)/);
+                    const cookieVal = cookieMatch ? cookieMatch[1] : trimmed;
+                    localStorage.setItem("spotiless_sp_dc", cookieVal);
+                    localStorage.setItem("sp_dc", cookieVal);
+                    return { ok: true, kind: "cookie" };
                 }
-                const cookieMatch = trimmed.match(/sp_dc=([a-zA-Z0-9_\-]+)/);
-                const cookieVal = cookieMatch ? cookieMatch[1] : trimmed;
-                localStorage.setItem("spotiless_sp_dc", cookieVal);
-                localStorage.setItem("sp_dc", cookieVal);
-                return "cookie";
+
+                const isPlaylist = /playlist[:/]/i.test(trimmed) || /^[a-zA-Z0-9]{22}$/.test(trimmed);
+                const param = isPlaylist
+                    ? `playlist=${encodeURIComponent(trimmed)}`
+                    : `user=${encodeURIComponent(trimmed)}`;
+
+                try {
+                    const res = await fetch(`/api/spotify_public?${param}`);
+                    const data = await res.json();
+                    if (!res.ok || !data.success || !Array.isArray(data.tracks) || !data.tracks.length) {
+                        return { ok: false, error: (data && data.error) || "Could not load public playlists. Make sure your playlists are Public on Spotify." };
+                    }
+
+                    const poolTitle = isPlaylist
+                        ? `🎵 ${(data.playlist && data.playlist.name) || "Public Playlist"}`
+                        : `🎵 ${data.username || trimmed}'s Public Playlists`;
+
+                    localStorage.setItem("spotiless_custom_cloud_tracks", JSON.stringify(data.tracks));
+                    localStorage.setItem("spotiless_custom_pool_name", poolTitle);
+                    localStorage.setItem("spotiless_public_playlists", JSON.stringify(data.playlists || []));
+                    localStorage.setItem("spotiless_cloud_index", "0");
+                    if (data.user_id || !isPlaylist) {
+                        localStorage.setItem("spotiless_linked_user", data.username || trimmed);
+                    }
+                    if (data.playlists && data.playlists[0]) {
+                        localStorage.setItem("spotiless_linked_playlist", data.playlists[0].id);
+                    }
+                    return { ok: true, kind: "public", count: data.tracks.length, playlistsCount: (data.playlists || []).length, poolTitle };
+                } catch (err) {
+                    return { ok: false, error: "Could not reach Spotify loader right now. Try again or play Top Hits!" };
+                }
             }
 
             function syncView() {
                 const acc = getStoredAccount();
                 const hasCookie = !!getSpotifyCookie();
                 const linkedPlaylist = localStorage.getItem("spotiless_linked_playlist");
+                const customTracksRaw = localStorage.getItem("spotiless_custom_cloud_tracks");
+                const customPoolName = localStorage.getItem("spotiless_custom_pool_name");
 
                 const connectedCard = document.getElementById("login-connected-card");
                 const formCard = document.getElementById("login-form-card");
                 const nameEl = document.getElementById("connected-username");
                 const pillEl = document.getElementById("connected-spotify-pill");
                 const unlinkBtn = document.getElementById("btn-unlink-spotify-page");
+                const resetHitsBtn = document.getElementById("btn-reset-top-hits");
                 const userInput = document.getElementById("login-username");
 
                 if (acc && acc.username) {
@@ -375,7 +416,13 @@
                 }
 
                 if (pillEl) {
-                    if (hasCookie) {
+                    if (customTracksRaw) {
+                        let count = 0;
+                        try { count = JSON.parse(customTracksRaw).length; } catch (e) {}
+                        pillEl.textContent = `✓ ${customPoolName || "Public Playlists"} (${count} songs)`;
+                        pillEl.style.background = "rgba(29, 185, 84, 0.2)";
+                        pillEl.style.color = "#1ed760";
+                    } else if (hasCookie) {
                         pillEl.textContent = "✓ Spotify Cookie Linked";
                         pillEl.style.background = "rgba(29, 185, 84, 0.2)";
                         pillEl.style.color = "#1ed760";
@@ -390,8 +437,13 @@
                     }
                 }
 
+                if (resetHitsBtn) {
+                    if (customTracksRaw) resetHitsBtn.classList.remove("hidden");
+                    else resetHitsBtn.classList.add("hidden");
+                }
+
                 if (unlinkBtn) {
-                    if (hasCookie || linkedPlaylist) unlinkBtn.classList.remove("hidden");
+                    if (hasCookie || linkedPlaylist || customTracksRaw) unlinkBtn.classList.remove("hidden");
                     else unlinkBtn.classList.add("hidden");
                 }
             }
@@ -424,27 +476,42 @@
                 }
             };
 
-            window.submitLoginForm = function(e, forcedMode) {
+            window.submitLoginForm = async function(e, forcedMode) {
                 if (e && typeof e.preventDefault === "function") e.preventDefault();
                 const userInput = document.getElementById("login-username");
                 const passInput = document.getElementById("login-password");
                 const spotifyInput = document.getElementById("login-spotify-input");
+                const btnSignIn = document.getElementById("btn-signin-play");
+                const btnCreate = document.getElementById("btn-create-play");
                 const rawUser = (userInput ? userInput.value : "").trim();
                 const passVal = (passInput ? passInput.value : "").trim();
                 const spotifyVal = (spotifyInput ? spotifyInput.value : "").trim();
 
-                if (!rawUser) {
-                    showBanner("login-status-msg", "Please enter your username or email first.", true);
-                    showToast("Please enter a username or email.");
+                if (!rawUser && !spotifyVal) {
+                    showBanner("login-status-msg", "Please enter your username/email or a Spotify username/playlist link.", true);
+                    showToast("Please enter your username or email.");
                     if (userInput) userInput.focus();
                     return false;
                 }
 
-                let displayName = rawUser;
+                const effectiveUser = rawUser || spotifyVal;
+                let displayName = effectiveUser;
                 let emailStr = "";
-                if (rawUser.includes("@")) {
-                    emailStr = rawUser;
-                    displayName = rawUser.split("@")[0].trim() || rawUser;
+                if (effectiveUser.includes("@")) {
+                    emailStr = effectiveUser;
+                    displayName = effectiveUser.split("@")[0].trim() || effectiveUser;
+                }
+
+                if (spotifyVal) {
+                    if (btnSignIn) { btnSignIn.disabled = true; btnSignIn.textContent = "Loading Spotify Playlists..."; }
+                    if (btnCreate) btnCreate.disabled = true;
+                    const loadRes = await loadPublicSpotify(spotifyVal);
+                    if (btnSignIn) { btnSignIn.disabled = false; btnSignIn.textContent = "🔑 Sign In & Play"; }
+                    if (btnCreate) btnCreate.disabled = false;
+                    if (!loadRes.ok) {
+                        showBanner("login-status-msg", loadRes.error, true);
+                        return false;
+                    }
                 }
 
                 const existing = getStoredAccount() || {};
@@ -452,18 +519,14 @@
                     ...existing,
                     username: displayName,
                     email: emailStr || existing.email || "",
-                    raw_input: rawUser,
+                    raw_input: effectiveUser,
                     logged_in_at: Date.now()
                 };
                 localStorage.setItem("spotiless_account", JSON.stringify(acc));
-                localStorage.setItem("spotiless_account_name", rawUser);
+                localStorage.setItem("spotiless_account_name", effectiveUser);
                 localStorage.setItem("spotiless_username", displayName);
                 if (emailStr) localStorage.setItem("spotiless_account_email", emailStr);
                 if (passVal) localStorage.setItem("spotiless_account_has_pass", "1");
-
-                if (spotifyVal) {
-                    saveSpotifyInput(spotifyVal);
-                }
 
                 const modeUsed = forcedMode || activeMode;
                 const verb = modeUsed === "signup" ? "Account created" : "Signed in";
@@ -476,41 +539,53 @@
 
             window.connectSpotifyAndPlay = async function() {
                 const field = document.getElementById("spotify-link-field");
+                const btn = document.getElementById("btn-link-spotify-play");
                 const raw = (field ? field.value : "").trim();
                 if (!raw) {
-                    showBanner("spotify-status-msg", "Paste a Spotify playlist link or your sp_dc cookie first.", true);
+                    showBanner("spotify-status-msg", "Enter your Spotify username or paste a Public playlist link first.", true);
                     if (field) field.focus();
                     return;
                 }
 
-                const kind = saveSpotifyInput(raw);
-                if (kind === "playlist") {
-                    try {
-                        const res = await fetch("/api/playlists/load_custom", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ url_or_id: raw })
-                        });
-                        if (res.ok) {
-                            const data = await res.json();
-                            if (data && data.success) {
-                                window.location.href = "index.html";
-                                return;
-                            }
-                        }
-                    } catch (err) {}
-                    showBanner("spotify-status-msg", "Spotify playlist saved! Opening game...", false);
+                if (btn) {
+                    btn.disabled = true;
+                    btn.textContent = "Scanning Public Playlists...";
+                }
+
+                const loadRes = await loadPublicSpotify(raw);
+
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = "🎵 Load Public Playlists & Play";
+                }
+
+                if (!loadRes.ok) {
+                    showBanner("spotify-status-msg", loadRes.error, true);
+                    return;
+                }
+
+                if (loadRes.kind === "public") {
+                    showBanner("spotify-status-msg", `Loaded ${loadRes.count} songs from ${loadRes.playlistsCount || 1} public playlist(s)! Opening game...`, false);
                 } else {
                     showBanner("spotify-status-msg", "Spotify cookie linked! Opening game...", false);
                 }
 
                 if (!getStoredAccount()) {
-                    const fallback = { username: "Spotify Player", email: "", raw_input: "Spotify Player", logged_in_at: Date.now() };
+                    const label = localStorage.getItem("spotiless_linked_user") || raw;
+                    const fallback = { username: label, email: "", raw_input: label, logged_in_at: Date.now() };
                     localStorage.setItem("spotiless_account", JSON.stringify(fallback));
-                    localStorage.setItem("spotiless_account_name", "Spotify Player");
-                    localStorage.setItem("spotiless_username", "Spotify Player");
+                    localStorage.setItem("spotiless_account_name", label);
+                    localStorage.setItem("spotiless_username", label);
                 }
                 syncView();
+                window.location.href = "index.html";
+            };
+
+            window.resetToTopHitsOnPage = function() {
+                localStorage.removeItem("spotiless_custom_cloud_tracks");
+                localStorage.removeItem("spotiless_custom_pool_name");
+                localStorage.setItem("spotiless_cloud_index", "0");
+                showToast("Switched back to Cloud Top Hits!");
                 window.location.href = "index.html";
             };
 
@@ -518,6 +593,10 @@
                 localStorage.removeItem("spotiless_sp_dc");
                 localStorage.removeItem("sp_dc");
                 localStorage.removeItem("spotiless_linked_playlist");
+                localStorage.removeItem("spotiless_custom_cloud_tracks");
+                localStorage.removeItem("spotiless_custom_pool_name");
+                localStorage.removeItem("spotiless_public_playlists");
+                localStorage.removeItem("spotiless_linked_user");
                 showBanner("spotify-status-msg", "Spotify connection removed.", false);
                 syncView();
             };
