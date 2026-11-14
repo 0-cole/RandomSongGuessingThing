@@ -223,20 +223,17 @@ def spotify_public_endpoint():
     import re
     import json
     import base64
-    import hashlib
     import urllib.parse
     import concurrent.futures
     import requests as req_lib
 
     ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-    hashed_aliases = {
-        "1289b46b9fefb4d6d5fe0ec53879d82124343a5d77332f155cca0e8e822b888a": "31leppthj2runlbv3x6juui65bpa",
-        "f78b6cb9224209fe21027f4f6addf57ef2fdf4392e9362095ea8de7377f5451e": "31leppthj2runlbv3x6juui65bpa",
+    pathfinder_url = "https://api-partner.spotify.com/pathfinder/v1/query"
+    pf_hashes = {
+        "fetchPlaylist": "21ea11a6ac75a5f3e01fd365d29c18e0a4a8b7dc09f89bbb5d73910190c6acaf",
+        "searchUsers": "8f358dd82e62f61dd4ceaa9f8cd0889e644c9b707f1b724fbfb356a757cb7e5a",
+        "searchPlaylists": "d520014e748f9ea44f7707d8df1819867ac1205e8b7f3e28f22fe5fc858921b1",
     }
-    supplemental_user_playlists = {
-        "31leppthj2runlbv3x6juui65bpa": ["0fJ7qgTlbrwhsLuaToLpTt", "2Tdpwn6eJK39LMJKkbsuzH"],
-    }
-    excluded_third_party_ids = {"37i9dQZF1EIcpZCXN80nLP"}
 
     def parse_next_data(html_text):
         m = re.search(r'<script id="__NEXT_DATA__" type="application/json">([\s\S]*?)</script>', html_text)
@@ -247,17 +244,42 @@ def spotify_public_endpoint():
         except Exception:
             return None
 
+    def get_anon_token():
+        try:
+            r = req_lib.get("https://open.spotify.com/embed/track/5CZ40GBx1sQ9agT82CLQCT", headers={"User-Agent": ua}, timeout=6)
+            nd = parse_next_data(r.text) or {}
+            return nd.get("props", {}).get("pageProps", {}).get("state", {}).get("settings", {}).get("session", {}).get("accessToken")
+        except Exception:
+            return None
+
+    def query_pathfinder(op_name, sha256_hash, variables, token):
+        if not token:
+            return None
+        try:
+            ext = {"persistedQuery": {"version": 1, "sha256Hash": sha256_hash}}
+            url = (
+                f"{pathfinder_url}?operationName={urllib.parse.quote(op_name)}"
+                f"&variables={urllib.parse.quote(json.dumps(variables))}"
+                f"&extensions={urllib.parse.quote(json.dumps(ext))}"
+            )
+            r = req_lib.get(url, headers={"Authorization": f"Bearer {token}", "App-Platform": "WebPlayer", "User-Agent": ua}, timeout=8)
+            return r.json() if r.status_code == 200 else None
+        except Exception:
+            return None
+
     def fetch_playlist_embed(pid):
         r = req_lib.get(f"https://open.spotify.com/embed/playlist/{urllib.parse.quote(pid)}", headers={"User-Agent": ua}, timeout=8)
         if r.status_code != 200:
-            return {"playlist": None, "tracks": []}
+            return {"playlist": None, "tracks": [], "access_token": None}
         nd = parse_next_data(r.text) or {}
         state = nd.get("props", {}).get("pageProps", {}).get("state", {})
         entity = state.get("data", {}).get("entity") or {}
+        tok = (state.get("settings") or {}).get("session", {}).get("accessToken")
         if not entity:
-            return {"playlist": None, "tracks": []}
+            return {"playlist": None, "tracks": [], "access_token": tok}
         cover_sources = (entity.get("coverArt") or {}).get("sources") or (entity.get("visualIdentity") or {}).get("image") or []
         cover_url = cover_sources[0].get("url", "") if cover_sources else ""
+        owner_name = str(entity.get("subtitle") or "").strip()
         tracks = []
         for t in entity.get("trackList") or []:
             if not t or not t.get("title"):
@@ -279,9 +301,122 @@ def spotify_public_endpoint():
                 "playlist_name": entity.get("title", "Spotify Playlist"),
             })
         return {
-            "playlist": {"id": pid, "name": entity.get("title", "Spotify Playlist"), "image": cover_url, "tracks_count": len(tracks)},
+            "playlist": {
+                "id": pid,
+                "name": entity.get("title", "Spotify Playlist"),
+                "image": cover_url,
+                "tracks_count": len(tracks),
+                "owner_name": owner_name,
+            },
             "tracks": tracks,
+            "access_token": tok,
         }
+
+    def fetch_user_public_page(uid):
+        try:
+            ur = req_lib.get(
+                f"https://open.spotify.com/user/{urllib.parse.quote(uid)}",
+                headers={"User-Agent": "curl/8.4.0", "Accept": "text/html"},
+                timeout=8,
+            )
+            if ur.status_code != 200:
+                return None
+            im = re.search(r'<script[^>]*id="initialState"[^>]*>([\s\S]*?)</script>', ur.text)
+            if not im:
+                return None
+            st = json.loads(base64.b64decode(im.group(1).strip()).decode("utf-8"))
+            items = (st.get("entities") or {}).get("items") or {}
+            ukey = f"spotify:user:{uid}" if f"spotify:user:{uid}" in items else next((k for k in items if k.startswith("spotify:user:")), None)
+            if not ukey:
+                return None
+            uobj = items[ukey]
+            avs = (uobj.get("avatar") or {}).get("sources") or []
+            pls = []
+            for entry in (uobj.get("publicPlaylistsV2") or {}).get("items") or []:
+                e_uri = entry.get("_uri") or (entry.get("data") or {}).get("uri") or ""
+                pid = e_uri.split(":")[-1]
+                if pid:
+                    pdata = entry.get("data") or {}
+                    pls.append({"id": pid, "name": pdata.get("name", "Public Playlist"), "image": "", "tracks_count": None})
+            return {
+                "user_id": uobj.get("id") or uid,
+                "display_name": uobj.get("name") or uid,
+                "avatar": avs[-1].get("url", "") if avs else "",
+                "playlists": pls,
+            }
+        except Exception:
+            return None
+
+    def fetch_playlist_pathfinder(pid, tok):
+        d = query_pathfinder("fetchPlaylist", pf_hashes["fetchPlaylist"], {"uri": f"spotify:playlist:{pid}", "offset": 0, "limit": 200, "enableWatchFeedEntrypoint": False}, tok)
+        odata = ((d or {}).get("data") or {}).get("playlistV2", {}).get("ownerV2", {}).get("data") or {}
+        ouri = odata.get("uri") or ""
+        oid = odata.get("username") or (ouri.split(":")[-1] if ":" in ouri else "")
+        oname = odata.get("name") or oid or ""
+        return {"owner_id": oid, "owner_name": oname}
+
+    def load_playlist_and_creator(pid):
+        emb = fetch_playlist_embed(pid)
+        if not emb["tracks"]:
+            return None
+        tok = emb.get("access_token") or get_anon_token()
+        meta = fetch_playlist_pathfinder(pid, tok)
+        oid = meta.get("owner_id") or ""
+        oname = meta.get("owner_name") or (emb["playlist"] or {}).get("owner_name", "")
+        pl_map = {emb["playlist"]["id"]: emb["playlist"]} if emb.get("playlist") else {}
+        disp = oname
+        if oid and oid.lower() != "spotify":
+            prof = fetch_user_public_page(oid)
+            if prof:
+                if prof.get("display_name"):
+                    disp = prof["display_name"]
+                others = [p for p in prof.get("playlists", []) if p.get("id") and p["id"] != pid][:24]
+                if others:
+                    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
+                        h_res = list(pool.map(lambda p: fetch_playlist_embed(p["id"]), others))
+                    for res_p in h_res:
+                        pl_obj = res_p.get("playlist")
+                        if res_p.get("tracks") and pl_obj and str(pl_obj.get("owner_name", "")).lower() != "spotify":
+                            pl_map[pl_obj["id"]] = pl_obj
+        return {"playlist": emb["playlist"], "playlists": list(pl_map.values()), "tracks": emb["tracks"], "user_id": oid, "username": disp}
+
+    def discover_user_by_pathfinder(q_str, tok):
+        if not tok or not q_str:
+            return {"profile": None, "playlists": []}
+        q_low = q_str.strip().lower()
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+            fu = pool.submit(query_pathfinder, "searchUsers", pf_hashes["searchUsers"], {"searchTerm": q_str, "offset": 0, "limit": 20, "numberOfTopResults": 5, "includeAudiobooks": False}, tok)
+            fp = pool.submit(query_pathfinder, "searchPlaylists", pf_hashes["searchPlaylists"], {"searchTerm": q_str, "offset": 0, "limit": 50, "numberOfTopResults": 20, "includeAudiobooks": False}, tok)
+            u_data = fu.result()
+            p_data = fp.result()
+        raw_users = [it.get("data") for it in (((u_data or {}).get("data") or {}).get("searchV2") or {}).get("users", {}).get("items", []) if it and it.get("data")]
+        raw_pls = [it.get("data") for it in (((p_data or {}).get("data") or {}).get("searchV2") or {}).get("playlists", {}).get("items", []) if it and it.get("data")]
+        exact_u = next((u for u in raw_users if str(u.get("displayName", "")).lower() == q_low or str(u.get("username") or u.get("id") or "").lower() == q_low), None)
+        owner_match = None
+        for p in raw_pls:
+            o = (p.get("ownerV2") or {}).get("data") or {}
+            if str(o.get("name", "")).lower() == q_low or str(o.get("username", "")).lower() == q_low:
+                owner_match = o
+                break
+        cand_id = (exact_u and (exact_u.get("username") or exact_u.get("id"))) or (owner_match and owner_match.get("username")) or (raw_users[0].get("username") or raw_users[0].get("id") if raw_users else "")
+        merged = {}
+        prof = None
+        if cand_id:
+            prof = fetch_user_public_page(cand_id)
+            for pl in (prof or {}).get("playlists", []):
+                merged[pl["id"]] = pl
+            for p in raw_pls:
+                o = (p.get("ownerV2") or {}).get("data") or {}
+                oid = o.get("username") or ((o.get("uri") or "").split(":")[-1])
+                pid = (p.get("uri") or "").split(":")[-1]
+                if pid and oid == cand_id and pid not in merged:
+                    merged[pid] = {"id": pid, "name": p.get("name", "Public Playlist"), "image": "", "tracks_count": None, "owner_name": o.get("name", oid)}
+        if not merged:
+            for p in raw_pls[:15]:
+                pid = (p.get("uri") or "").split(":")[-1]
+                if pid and pid not in merged:
+                    merged[pid] = {"id": pid, "name": p.get("name", "Public Playlist"), "image": "", "tracks_count": None}
+        return {"profile": prof, "playlists": list(merged.values())}
 
     proxy_audio = request.args.get("proxy_audio", "").strip()
     if proxy_audio:
@@ -358,62 +493,61 @@ def spotify_public_endpoint():
         pid = pm.group(1) if pm else playlist_arg.split("?")[0].split("#")[0].strip()
         if not re.match(r"^[a-zA-Z0-9]{22}$", pid):
             return jsonify({"success": False, "error": "Invalid Spotify playlist link or ID"}), 400
-        res_pl = fetch_playlist_embed(pid)
-        if not res_pl["tracks"]:
+        loaded = load_playlist_and_creator(pid)
+        if not loaded or not loaded["tracks"]:
             return jsonify({"success": False, "error": "No tracks found. Make sure the playlist is Public."}), 404
-        return jsonify({"success": True, "playlist": res_pl["playlist"], "playlists": [res_pl["playlist"]], "tracks": res_pl["tracks"]})
+        return jsonify({
+            "success": True,
+            "playlist": loaded["playlist"],
+            "playlists": loaded["playlists"],
+            "tracks": loaded["tracks"],
+            "user_id": loaded.get("user_id", ""),
+            "username": loaded.get("username", ""),
+        })
 
     user_arg = request.args.get("user", "").strip()
     if user_arg:
         pm = re.search(r"(?:open\.spotify\.com/playlist/|spotify:playlist:)([a-zA-Z0-9]+)", user_arg, re.I)
         if pm:
-            res_pl = fetch_playlist_embed(pm.group(1))
-            if not res_pl["tracks"]:
+            loaded = load_playlist_and_creator(pm.group(1))
+            if not loaded or not loaded["tracks"]:
                 return jsonify({"success": False, "error": "Playlist has no tracks or is Private."}), 404
-            return jsonify({"success": True, "username": (res_pl["playlist"] or {}).get("name", pm.group(1)), "playlists": [res_pl["playlist"]], "tracks": res_pl["tracks"]})
+            return jsonify({
+                "success": True,
+                "playlist": loaded["playlist"],
+                "username": loaded.get("username") or (loaded["playlist"] or {}).get("name", pm.group(1)),
+                "user_id": loaded.get("user_id", ""),
+                "playlists": loaded["playlists"],
+                "tracks": loaded["tracks"],
+            })
 
         um = re.search(r"(?:open\.spotify\.com/user/|spotify:user:)([a-zA-Z0-9_.-]+)", user_arg, re.I)
         uid = (um.group(1) if um else user_arg).split("?")[0].split("#")[0].strip()
-        uid_hash = hashlib.sha256(uid.lower().encode("utf-8")).hexdigest()
-        uid = hashed_aliases.get(uid_hash, uid)
+        resolved_uid = uid
 
-        playlists = []
-        display_name = uid
-        avatar = ""
-        try:
-            ur = req_lib.get(f"https://open.spotify.com/user/{urllib.parse.quote(uid)}", headers={"User-Agent": "curl/8.4.0", "Accept": "text/html"}, timeout=8)
-            if ur.status_code == 200:
-                im = re.search(r'<script[^>]*id="initialState"[^>]*>([\s\S]*?)</script>', ur.text)
-                if im:
-                    st = json.loads(base64.b64decode(im.group(1).strip()).decode("utf-8"))
-                    items = (st.get("entities") or {}).get("items") or {}
-                    ukey = f"spotify:user:{uid}" if f"spotify:user:{uid}" in items else next((k for k in items if k.startswith("spotify:user:")), None)
-                    if ukey:
-                        uobj = items[ukey]
-                        display_name = uobj.get("name") or uid
-                        avs = (uobj.get("avatar") or {}).get("sources") or []
-                        avatar = avs[-1].get("url", "") if avs else ""
-                        for entry in (uobj.get("publicPlaylistsV2") or {}).get("items") or []:
-                            e_uri = entry.get("_uri") or (entry.get("data") or {}).get("uri") or ""
-                            pid = e_uri.split(":")[-1]
-                            if pid and pid not in excluded_third_party_ids:
-                                pdata = entry.get("data") or {}
-                                playlists.append({"id": pid, "name": pdata.get("name", "Public Playlist"), "image": "", "tracks_count": None})
-        except Exception:
-            pass
+        profile = fetch_user_public_page(uid)
+        playlists = list((profile or {}).get("playlists") or [])
+        display_name = (profile or {}).get("display_name") or uid
+        avatar = (profile or {}).get("avatar") or ""
 
-        existing_ids = {p["id"] for p in playlists}
-        for sup_id in supplemental_user_playlists.get(uid, []):
-            if sup_id not in existing_ids:
-                existing_ids.add(sup_id)
-                playlists.append({"id": sup_id, "name": "Public Playlist", "image": "", "tracks_count": None})
-
-        playlists = [p for p in playlists if p.get("id") not in excluded_third_party_ids]
+        if not profile or not playlists:
+            tok = get_anon_token()
+            discovered = discover_user_by_pathfinder(user_arg, tok)
+            if discovered.get("profile"):
+                profile = discovered["profile"]
+                resolved_uid = profile.get("user_id") or resolved_uid
+                display_name = profile.get("display_name") or display_name
+                avatar = profile.get("avatar") or avatar
+            existing_ids = {p["id"] for p in playlists if p.get("id")}
+            for p in discovered.get("playlists") or []:
+                if p.get("id") and p["id"] not in existing_ids:
+                    existing_ids.add(p["id"])
+                    playlists.append(p)
 
         if not playlists:
-            return jsonify({"success": False, "error": "Could not find any public playlists for that Spotify username. Make sure your playlists are set to Public on Spotify."}), 404
+            return jsonify({"success": False, "error": "Could not find any public playlists for that Spotify profile or handle. Make sure your playlists are set to Public on Spotify, or paste a Public Playlist link."}), 404
 
-        top_pls = playlists[:25]
+        top_pls = [p for p in playlists if p.get("id")][:25]
         with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
             fetched = list(pool.map(lambda p: fetch_playlist_embed(p["id"]), top_pls))
 
@@ -423,6 +557,9 @@ def spotify_public_endpoint():
         for idx, res_pl in enumerate(fetched):
             if res_pl["tracks"]:
                 pl_info = res_pl["playlist"] or top_pls[idx]
+                pl_owner = str(pl_info.get("owner_name") or top_pls[idx].get("owner_name") or "").strip().lower()
+                if pl_owner == "spotify" and resolved_uid.lower() != "spotify":
+                    continue
                 hydrated_pls.append(pl_info)
                 for tr in res_pl["tracks"]:
                     key = tr.get("id") or f"{tr.get('name', '').lower()}::{tr.get('artist', '').lower()}"
@@ -433,7 +570,7 @@ def spotify_public_endpoint():
         if not all_tracks:
             return jsonify({"success": False, "error": "Found playlists, but none had public tracks available."}), 404
 
-        return jsonify({"success": True, "username": display_name, "user_id": uid, "avatar": avatar, "playlists": hydrated_pls, "tracks": all_tracks})
+        return jsonify({"success": True, "username": display_name, "user_id": resolved_uid, "avatar": avatar, "playlists": hydrated_pls, "tracks": all_tracks})
 
     return jsonify({"success": False, "error": "Provide ?user=, ?playlist=, ?track_preview=, or ?proxy_audio="}), 400
 

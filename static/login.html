@@ -248,9 +248,9 @@
 
             <!-- Connect Spotify Card (Mobile & PC) -->
             <section id="spotify-connect-card" class="login-card">
-                <h2>&#127925; Connect Spotify via Username or Playlist (Mobile &amp; PC)</h2>
+                <h2>&#127925; Connect Spotify via Profile, Playlist, or Username</h2>
                 <p class="subtitle">
-                    Just paste your <strong>Spotify username</strong>, <strong>profile link</strong>, or any <strong>public playlist link</strong> — no password or cookie needed! <strong>Note:</strong> Your playlists must be set to <strong>Public</strong> on Spotify.
+                    Paste your <strong>Spotify profile link</strong>, <strong>any public playlist link</strong> (also auto-loads your other public playlists), or <strong>Spotify username</strong> — no password or cookie needed! <strong>Note:</strong> Playlists must be set to <strong>Public</strong> on Spotify.
                 </p>
 
                 <div style="background: rgba(255, 170, 0, 0.12); border: 1px solid rgba(255, 170, 0, 0.35); border-radius: var(--radius-sm); padding: 10px 12px; margin-bottom: 12px; font-size: 0.78rem; color: #ffd27d; line-height: 1.45;">
@@ -374,18 +374,39 @@
                         ? `🎵 ${(data.playlist && data.playlist.name) || "Public Playlist"}`
                         : `🎵 ${data.username || trimmed}'s Public Playlists`;
 
+                    const prevUser = localStorage.getItem("spotiless_linked_user") || "";
+                    const nextUser = data.user_id || "";
+                    let prevPlaylists = [];
+                    try {
+                        prevPlaylists = JSON.parse(localStorage.getItem("spotiless_public_playlists") || "[]");
+                        if (!Array.isArray(prevPlaylists)) prevPlaylists = [];
+                    } catch (e) { prevPlaylists = []; }
+
+                    const incomingPlaylists = Array.isArray(data.playlists) ? data.playlists : [];
+                    const sameCreator = !prevUser || !nextUser || prevUser === nextUser;
+                    const mergedMap = new Map();
+                    if (isPlaylist || sameCreator) {
+                        prevPlaylists.forEach((p) => { if (p && p.id) mergedMap.set(p.id, p); });
+                    }
+                    incomingPlaylists.forEach((p) => { if (p && p.id) mergedMap.set(p.id, p); });
+                    const mergedPlaylists = Array.from(mergedMap.values());
+
                     localStorage.setItem("spotiless_custom_cloud_tracks", JSON.stringify(data.tracks));
                     localStorage.setItem("spotiless_custom_pool_name", poolTitle);
-                    localStorage.setItem("spotiless_public_playlists", JSON.stringify(data.playlists || []));
-                    localStorage.setItem("spotiless_playlists_schema", "v1.4.5");
+                    localStorage.setItem("spotiless_public_playlists", JSON.stringify(mergedPlaylists));
+                    localStorage.setItem("spotiless_playlists_schema", "v1.4.6");
                     localStorage.setItem("spotiless_cloud_index", "0");
-                    if (data.user_id || !isPlaylist) {
+                    if (nextUser) {
+                        localStorage.setItem("spotiless_linked_user", nextUser);
+                    } else if (!isPlaylist && trimmed) {
                         localStorage.setItem("spotiless_linked_user", data.username || trimmed);
                     }
-                    if (data.playlists && data.playlists[0]) {
-                        localStorage.setItem("spotiless_linked_playlist", data.playlists[0].id);
+                    if (data.playlist && data.playlist.id) {
+                        localStorage.setItem("spotiless_linked_playlist", data.playlist.id);
+                    } else if (mergedPlaylists[0]) {
+                        localStorage.setItem("spotiless_linked_playlist", mergedPlaylists[0].id);
                     }
-                    return { ok: true, kind: "public", count: data.tracks.length, playlistsCount: (data.playlists || []).length, poolTitle };
+                    return { ok: true, kind: "public", count: data.tracks.length, playlistsCount: mergedPlaylists.length, poolTitle };
                 } catch (err) {
                     return { ok: false, error: "Could not reach Spotify loader right now. Try again or play Top Hits!" };
                 }

@@ -3,22 +3,14 @@
 // 2. Strict Fast-Path Budget: Capped at 1–2 tool calls total (Read -> Edit -> Done).
 // 3. Do not wander or perform exploratory sweeps. Make direct edits cleanly.
 
-const crypto = require("crypto");
-
 const USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 
-const HASHED_USER_ALIASES = {
-    "1289b46b9fefb4d6d5fe0ec53879d82124343a5d77332f155cca0e8e822b888a": "31leppthj2runlbv3x6juui65bpa",
-    "f78b6cb9224209fe21027f4f6addf57ef2fdf4392e9362095ea8de7377f5451e": "31leppthj2runlbv3x6juui65bpa"
+const PATHFINDER_ENDPOINT = "https://api-partner.spotify.com/pathfinder/v1/query";
+const PATHFINDER_HASHES = {
+    fetchPlaylist: "21ea11a6ac75a5f3e01fd365d29c18e0a4a8b7dc09f89bbb5d73910190c6acaf",
+    searchUsers: "8f358dd82e62f61dd4ceaa9f8cd0889e644c9b707f1b724fbfb356a757cb7e5a",
+    searchPlaylists: "d520014e748f9ea44f7707d8df1819867ac1205e8b7f3e28f22fe5fc858921b1"
 };
-
-const SUPPLEMENTAL_USER_PLAYLISTS = {
-    "31leppthj2runlbv3x6juui65bpa": ["0fJ7qgTlbrwhsLuaToLpTt", "2Tdpwn6eJK39LMJKkbsuzH"]
-};
-
-const EXCLUDED_THIRD_PARTY_IDS = new Set([
-    "37i9dQZF1EIcpZCXN80nLP"
-]);
 
 const ALLOWED_PROXY_HOSTS = [
     "p.scdn.co",
@@ -34,10 +26,7 @@ function extractUserId(raw) {
     if (urlMatch) val = urlMatch[1];
     const uriMatch = val.match(/^spotify:user:([a-zA-Z0-9_.-]+)$/i);
     if (uriMatch) val = uriMatch[1];
-    val = val.split("?")[0].split("#")[0].trim();
-    const lower = val.toLowerCase();
-    const hash = crypto.createHash("sha256").update(lower).digest("hex");
-    return HASHED_USER_ALIASES[hash] || val;
+    return val.split("?")[0].split("#")[0].trim();
 }
 
 function extractPlaylistId(raw) {
@@ -122,12 +111,15 @@ async function fetchPlaylistEmbed(playlistId) {
             };
         });
 
+    const ownerName = String(entity.subtitle || "").trim();
+
     return {
         playlist: {
             id: playlistId,
             name: entity.title || "Spotify Playlist",
             image: coverUrl,
-            tracks_count: tracks.length
+            tracks_count: tracks.length,
+            owner_name: ownerName
         },
         tracks,
         accessToken
@@ -193,43 +185,192 @@ async function getAnonymousAccessToken() {
     }
 }
 
-async function searchPublicPlaylistsByApi(query, token) {
-    if (!token || !query) return [];
+async function queryPathfinder(operationName, sha256Hash, variables, token) {
+    if (!token) return null;
     try {
-        const uRes = await fetch(`https://api.spotify.com/v1/users/${encodeURIComponent(query)}/playlists?limit=20`, {
-            headers: { "Authorization": `Bearer ${token}` }
+        const extensions = { persistedQuery: { version: 1, sha256Hash } };
+        const url = `${PATHFINDER_ENDPOINT}?operationName=${encodeURIComponent(operationName)}&variables=${encodeURIComponent(JSON.stringify(variables))}&extensions=${encodeURIComponent(JSON.stringify(extensions))}`;
+        const res = await fetch(url, {
+            headers: {
+                "Authorization": `Bearer ${token}`,
+                "App-Platform": "WebPlayer",
+                "User-Agent": USER_AGENT
+            }
         });
-        if (uRes.ok) {
-            const uData = await uRes.json();
-            if (Array.isArray(uData.items) && uData.items.length > 0) {
-                return uData.items.map((p) => ({
-                    id: p.id,
-                    name: p.name,
-                    image: (p.images && p.images[0] && p.images[0].url) || "",
-                    tracks_count: (p.tracks && p.tracks.total) || 0
-                }));
+        if (!res.ok) return null;
+        return await res.json();
+    } catch (e) {
+        return null;
+    }
+}
+
+async function fetchPlaylistPathfinder(playlistId, token) {
+    if (!playlistId || !token) return { owner_id: "", owner_name: "" };
+    const data = await queryPathfinder(
+        "fetchPlaylist",
+        PATHFINDER_HASHES.fetchPlaylist,
+        { uri: `spotify:playlist:${playlistId}`, offset: 0, limit: 200, enableWatchFeedEntrypoint: false },
+        token
+    );
+    const pl = data && data.data && data.data.playlistV2;
+    const ownerData = pl && pl.ownerV2 && pl.ownerV2.data;
+    const ownerUri = (ownerData && ownerData.uri) || "";
+    const ownerId = (ownerData && ownerData.username) || (ownerUri.includes(":") ? ownerUri.split(":").pop() : "");
+    const ownerName = (ownerData && ownerData.name) || ownerId || "";
+    return { owner_id: ownerId, owner_name: ownerName };
+}
+
+async function discoverUserAndPlaylistsByPathfinder(query, token) {
+    if (!token || !query) return { profile: null, playlists: [] };
+    const qLower = query.trim().toLowerCase();
+
+    const [usersData, playlistsData] = await Promise.all([
+        queryPathfinder(
+            "searchUsers",
+            PATHFINDER_HASHES.searchUsers,
+            { searchTerm: query, offset: 0, limit: 20, numberOfTopResults: 5, includeAudiobooks: false },
+            token
+        ),
+        queryPathfinder(
+            "searchPlaylists",
+            PATHFINDER_HASHES.searchPlaylists,
+            { searchTerm: query, offset: 0, limit: 50, numberOfTopResults: 20, includeAudiobooks: false },
+            token
+        )
+    ]);
+
+    const rawUsers = ((usersData && usersData.data && usersData.data.searchV2 && usersData.data.searchV2.users && usersData.data.searchV2.users.items) || [])
+        .map((it) => it && it.data)
+        .filter(Boolean);
+    const rawPlaylists = ((playlistsData && playlistsData.data && playlistsData.data.searchV2 && playlistsData.data.searchV2.playlists && playlistsData.data.searchV2.playlists.items) || [])
+        .map((it) => it && it.data)
+        .filter(Boolean);
+
+    const exactUser = rawUsers.find((u) => {
+        const dn = String(u.displayName || "").toLowerCase();
+        const un = String(u.username || u.id || "").toLowerCase();
+        return dn === qLower || un === qLower;
+    });
+
+    let matchedOwnerFromPlaylists = null;
+    for (const p of rawPlaylists) {
+        const o = (p.ownerV2 && p.ownerV2.data) || {};
+        const on = String(o.name || "").toLowerCase();
+        const ou = String(o.username || "").toLowerCase();
+        if (on === qLower || ou === qLower) {
+            matchedOwnerFromPlaylists = o;
+            break;
+        }
+    }
+
+    const candidateUserId =
+        (exactUser && (exactUser.username || exactUser.id)) ||
+        (matchedOwnerFromPlaylists && matchedOwnerFromPlaylists.username) ||
+        (rawUsers[0] && (rawUsers[0].username || rawUsers[0].id)) ||
+        "";
+
+    const mergedMap = new Map();
+    let profile = null;
+
+    if (candidateUserId) {
+        profile = await fetchUserPublicPage(candidateUserId);
+        if (profile && Array.isArray(profile.playlists)) {
+            profile.playlists.forEach((pl) => {
+                if (pl && pl.id) mergedMap.set(pl.id, pl);
+            });
+        }
+        rawPlaylists.forEach((p) => {
+            const owner = (p.ownerV2 && p.ownerV2.data) || {};
+            const ownerId = owner.username || ((owner.uri || "").split(":").pop()) || "";
+            const uri = p.uri || "";
+            const pid = uri.includes(":") ? uri.split(":").pop() : "";
+            if (pid && ownerId === candidateUserId && !mergedMap.has(pid)) {
+                const imgItems = (p.images && p.images.items) || [];
+                const imgSrcs = imgItems[0] && imgItems[0].sources ? imgItems[0].sources : [];
+                mergedMap.set(pid, {
+                    id: pid,
+                    name: p.name || "Public Playlist",
+                    image: (imgSrcs[0] && imgSrcs[0].url) || "",
+                    tracks_count: null,
+                    owner_name: owner.name || ownerId
+                });
+            }
+        });
+    }
+
+    if (mergedMap.size === 0) {
+        rawPlaylists.slice(0, 15).forEach((p) => {
+            const uri = p.uri || "";
+            const pid = uri.includes(":") ? uri.split(":").pop() : "";
+            const owner = (p.ownerV2 && p.ownerV2.data) || {};
+            if (pid && !mergedMap.has(pid)) {
+                const imgItems = (p.images && p.images.items) || [];
+                const imgSrcs = imgItems[0] && imgItems[0].sources ? imgItems[0].sources : [];
+                mergedMap.set(pid, {
+                    id: pid,
+                    name: p.name || "Public Playlist",
+                    image: (imgSrcs[0] && imgSrcs[0].url) || "",
+                    tracks_count: null,
+                    owner_name: owner.name || ""
+                });
+            }
+        });
+    }
+
+    return {
+        profile,
+        playlists: Array.from(mergedMap.values())
+    };
+}
+
+async function loadPlaylistAndCreator(playlistId) {
+    const embed = await fetchPlaylistEmbed(playlistId);
+    if (!embed || !embed.tracks.length) return null;
+
+    const token = embed.accessToken || await getAnonymousAccessToken();
+    const meta = await fetchPlaylistPathfinder(playlistId, token);
+    const ownerId = meta.owner_id || "";
+    const ownerName = meta.owner_name || (embed.playlist && embed.playlist.owner_name) || "";
+
+    const playlistsMap = new Map();
+    if (embed.playlist && embed.playlist.id) {
+        playlistsMap.set(embed.playlist.id, embed.playlist);
+    }
+
+    let resolvedDisplayName = ownerName;
+    if (ownerId && ownerId.toLowerCase() !== "spotify") {
+        const profile = await fetchUserPublicPage(ownerId);
+        if (profile) {
+            if (profile.display_name) resolvedDisplayName = profile.display_name;
+            const others = (profile.playlists || []).filter((p) => p && p.id && p.id !== playlistId).slice(0, 24);
+            if (others.length) {
+                const hydrated = await Promise.allSettled(others.map((p) => fetchPlaylistEmbed(p.id)));
+                hydrated.forEach((r, idx) => {
+                    const basePl = others[idx];
+                    if (r.status === "fulfilled" && r.value && r.value.tracks.length) {
+                        const pl = r.value.playlist || basePl;
+                        const plOwner = String(pl.owner_name || "").toLowerCase();
+                        if (plOwner === "spotify") return;
+                        playlistsMap.set(pl.id, {
+                            id: pl.id,
+                            name: pl.name || basePl.name,
+                            image: pl.image || basePl.image || "",
+                            tracks_count: r.value.tracks.length,
+                            owner_name: pl.owner_name || ""
+                        });
+                    }
+                });
             }
         }
-    } catch (e) {}
+    }
 
-    try {
-        const sRes = await fetch(`https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=playlist&limit=10`, {
-            headers: { "Authorization": `Bearer ${token}` }
-        });
-        if (sRes.ok) {
-            const sData = await sRes.json();
-            const items = (sData.playlists && sData.playlists.items) || [];
-            return items
-                .filter((p) => p && p.id)
-                .map((p) => ({
-                    id: p.id,
-                    name: p.name,
-                    image: (p.images && p.images[0] && p.images[0].url) || "",
-                    tracks_count: (p.tracks && p.tracks.total) || 0
-                }));
-        }
-    } catch (e) {}
-    return [];
+    return {
+        playlist: embed.playlist,
+        playlists: Array.from(playlistsMap.values()),
+        tracks: embed.tracks,
+        user_id: ownerId,
+        username: resolvedDisplayName
+    };
 }
 
 async function resolveTrackPreviewWaterfall(trackId, q) {
@@ -350,15 +491,15 @@ module.exports = async function handler(req, res) {
         return res.status(200).json(resolved);
     }
 
-    // 3. Single public playlist loader
+    // 3. Single public playlist loader (+ auto-discover creator's public playlists)
     if (query.playlist) {
         const playlistId = extractPlaylistId(query.playlist);
         if (!playlistId) {
             return res.status(400).json({ success: false, error: "Invalid Spotify playlist link or ID" });
         }
         try {
-            const { playlist, tracks } = await fetchPlaylistEmbed(playlistId);
-            if (!tracks.length) {
+            const loaded = await loadPlaylistAndCreator(playlistId);
+            if (!loaded || !loaded.tracks.length) {
                 return res.status(404).json({
                     success: false,
                     error: "No playable tracks found. Make sure the playlist is set to Public on Spotify."
@@ -366,30 +507,34 @@ module.exports = async function handler(req, res) {
             }
             return res.status(200).json({
                 success: true,
-                playlist,
-                playlists: playlist ? [playlist] : [],
-                tracks
+                playlist: loaded.playlist,
+                playlists: loaded.playlists,
+                tracks: loaded.tracks,
+                user_id: loaded.user_id,
+                username: loaded.username
             });
         } catch (err) {
             return res.status(500).json({ success: false, error: err.message });
         }
     }
 
-    // 4. Spotify username / profile loader -> fetches all public playlists + tracks
+    // 4. Spotify username / profile / playlist loader -> universally resolves public playlists + tracks
     if (query.user) {
         const rawUser = String(query.user || "").trim();
         const playlistIdFromUserInput = extractPlaylistId(rawUser);
         if (playlistIdFromUserInput) {
             try {
-                const { playlist, tracks } = await fetchPlaylistEmbed(playlistIdFromUserInput);
-                if (!tracks.length) {
+                const loaded = await loadPlaylistAndCreator(playlistIdFromUserInput);
+                if (!loaded || !loaded.tracks.length) {
                     return res.status(404).json({ success: false, error: "Playlist has no tracks or is Private." });
                 }
                 return res.status(200).json({
                     success: true,
-                    username: playlist ? playlist.name : playlistIdFromUserInput,
-                    playlists: playlist ? [playlist] : [],
-                    tracks
+                    playlist: loaded.playlist,
+                    username: loaded.username || (loaded.playlist && loaded.playlist.name) || playlistIdFromUserInput,
+                    user_id: loaded.user_id || "",
+                    playlists: loaded.playlists,
+                    tracks: loaded.tracks
                 });
             } catch (err) {
                 return res.status(500).json({ success: false, error: err.message });
@@ -397,34 +542,40 @@ module.exports = async function handler(req, res) {
         }
 
         const userId = extractUserId(rawUser);
+        let resolvedUserId = userId;
         let profile = await fetchUserPublicPage(userId);
-        let playlists = profile ? profile.playlists : [];
+        let playlists = (profile && Array.isArray(profile.playlists)) ? profile.playlists.slice() : [];
         let displayName = (profile && profile.display_name) || userId;
         let avatar = (profile && profile.avatar) || "";
 
-        if (!playlists.length) {
+        if (!profile || !playlists.length) {
             const token = await getAnonymousAccessToken();
-            playlists = await searchPublicPlaylistsByApi(userId, token);
+            const discovered = await discoverUserAndPlaylistsByPathfinder(rawUser, token);
+            if (discovered.profile) {
+                profile = discovered.profile;
+                resolvedUserId = profile.user_id || resolvedUserId;
+                displayName = profile.display_name || displayName;
+                avatar = profile.avatar || avatar;
+            }
+            if (Array.isArray(discovered.playlists) && discovered.playlists.length) {
+                const existingPlIds = new Set(playlists.map((p) => p.id));
+                discovered.playlists.forEach((p) => {
+                    if (p && p.id && !existingPlIds.has(p.id)) {
+                        existingPlIds.add(p.id);
+                        playlists.push(p);
+                    }
+                });
+            }
         }
 
         if (!playlists.length) {
             return res.status(404).json({
                 success: false,
-                error: "Could not find any public playlists for that Spotify username. Make sure your playlists are set to Public on Spotify, or paste a Public Playlist link directly."
+                error: "Could not find any public playlists for that Spotify profile or handle. Make sure your playlists are set to Public on Spotify, or paste a Public Playlist link directly."
             });
         }
 
-        const supplementalIds = SUPPLEMENTAL_USER_PLAYLISTS[userId] || [];
-        const existingPlIds = new Set(playlists.map((p) => p.id));
-        supplementalIds.forEach((pid) => {
-            if (!existingPlIds.has(pid)) {
-                existingPlIds.add(pid);
-                playlists.push({ id: pid, name: "Public Playlist", image: "", tracks_count: null });
-            }
-        });
-
-        const filteredPlaylists = playlists.filter((p) => p && p.id && !EXCLUDED_THIRD_PARTY_IDS.has(p.id));
-        const topPlaylists = filteredPlaylists.slice(0, 25);
+        const topPlaylists = playlists.filter((p) => p && p.id).slice(0, 25);
         const results = await Promise.allSettled(topPlaylists.map((p) => fetchPlaylistEmbed(p.id)));
 
         const hydratedPlaylists = [];
@@ -435,11 +586,16 @@ module.exports = async function handler(req, res) {
             const basePl = topPlaylists[idx];
             if (r.status === "fulfilled" && r.value && r.value.tracks.length) {
                 const pl = r.value.playlist || basePl;
+                const plOwner = String(pl.owner_name || basePl.owner_name || "").trim().toLowerCase();
+                if (plOwner === "spotify" && resolvedUserId.toLowerCase() !== "spotify") {
+                    return;
+                }
                 hydratedPlaylists.push({
                     id: pl.id,
                     name: pl.name || basePl.name,
                     image: pl.image || basePl.image || "",
-                    tracks_count: r.value.tracks.length
+                    tracks_count: r.value.tracks.length,
+                    owner_name: pl.owner_name || basePl.owner_name || ""
                 });
                 r.value.tracks.forEach((t) => {
                     const key = t.id || `${t.name.toLowerCase()}::${t.artist.toLowerCase()}`;
@@ -461,7 +617,7 @@ module.exports = async function handler(req, res) {
         return res.status(200).json({
             success: true,
             username: displayName,
-            user_id: userId,
+            user_id: resolvedUserId,
             avatar,
             playlists: hydratedPlaylists,
             tracks: allTracks

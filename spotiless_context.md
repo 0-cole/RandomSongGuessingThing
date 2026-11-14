@@ -57,7 +57,13 @@
 - **In-Flight Round & Streak Preservation on Reload ([static/app.js](file:///d:/DOWNLOAD/RandomSongGuessingThing/static/app.js))**:
   - Implemented `saveActiveRound()` and `spotiless_cloud_active_round` in `localStorage`.
   - Reloading the page in the middle of a song now safely restores the active track, current attempt, and all previous guesses (correct, wrong, skipped) alongside streaks.
-- Bumped version to `v1.4.6`.
+- **Universal Multi-User Spotify Discovery (`v1.4.6`, [api/spotify_public.js](file:///d:/DOWNLOAD/RandomSongGuessingThing/api/spotify_public.js), [backend/app.py](file:///d:/DOWNLOAD/RandomSongGuessingThing/backend/app.py), [backend/spotify_manager.py](file:///d:/DOWNLOAD/RandomSongGuessingThing/backend/spotify_manager.py))**:
+  - Removed all hardcoded user IDs, SHA-256 user aliases, plaintext personal handles, and personal playlist IDs across frontend and backend.
+  - Added Spotify **Pathfinder GraphQL** (`fetchPlaylist`, `searchUsers`, `searchPlaylists`) using anonymous embed tokens for universal handle/display-name lookup and playlist-link-to-creator auto-discovery (`loadPlaylistAndCreator`), plus dynamic filtering of third-party Spotify radio mixes (`owner_name === "Spotify"` unless requesting `spotify`).
+  - Upgraded `backend/spotify_manager.py` to resolve arbitrary desktop logged-in profiles dynamically and query `spclient.wg.spotify.com/user-profile-view/v3/profile/` with `playlist_limit=50`.
+- **Additive Playlist Merging ([static/app.js](file:///d:/DOWNLOAD/RandomSongGuessingThing/static/app.js), [static/login.html](file:///d:/DOWNLOAD/RandomSongGuessingThing/static/login.html), [static/index.html](file:///d:/DOWNLOAD/RandomSongGuessingThing/static/index.html))**:
+  - Pasting an extra public playlist link or refreshing a linked profile merges playlists additively into `localStorage` (`spotiless_public_playlists`, schema `v1.4.6`) and saves discovered creator `user_id` into `spotiless_linked_user`.
+- Bumped version and asset cache busters (`?v=1.4.6`) across frontend and backend.
 
 ## 3b. Prior Verified State (`v1.4.5`)
 - **Username/Email Privacy Cleanup ([static/login.html](file:///d:/DOWNLOAD/RandomSongGuessingThing/static/login.html), [api/spotify_public.js](file:///d:/DOWNLOAD/RandomSongGuessingThing/api/spotify_public.js), [backend/app.py](file:///d:/DOWNLOAD/RandomSongGuessingThing/backend/app.py))**: Removed all hardcoded plaintext usernames and emails from HTML placeholders and server code; replaced internal alias lookup with SHA-256 hash matching.

@@ -373,11 +373,26 @@ document.addEventListener("DOMContentLoaded", () => {
                     }
 
                     if (Array.isArray(data.playlists) && data.playlists.length) {
+                        let prevUser = "";
+                        try { prevUser = localStorage.getItem("spotiless_linked_user") || ""; } catch (e) {}
+                        const nextUser = data.user_id || (!playlistMatch ? (data.username || raw) : prevUser);
+                        const sameCreator = Boolean(prevUser && nextUser && prevUser.toLowerCase() === nextUser.toLowerCase());
+                        let existing = [];
+                        if (playlistMatch || sameCreator) {
+                            try {
+                                const parsed = JSON.parse(localStorage.getItem("spotiless_public_playlists") || "[]");
+                                if (Array.isArray(parsed)) existing = parsed;
+                            } catch (e) {}
+                        }
+                        const mergedMap = new Map();
+                        existing.forEach((p) => { if (p && p.id) mergedMap.set(p.id, p); });
+                        data.playlists.forEach((p) => { if (p && p.id) mergedMap.set(p.id, p); });
+                        const mergedPlaylists = Array.from(mergedMap.values());
                         try {
-                            localStorage.setItem("spotiless_public_playlists", JSON.stringify(data.playlists));
-                            localStorage.setItem("spotiless_playlists_schema", "v1.4.5");
+                            localStorage.setItem("spotiless_public_playlists", JSON.stringify(mergedPlaylists));
+                            localStorage.setItem("spotiless_playlists_schema", "v1.4.6");
                         } catch (e) {}
-                        cachedUserPlaylists = data.playlists;
+                        cachedUserPlaylists = mergedPlaylists;
                     }
                     if (!playlistMatch) {
                         try {
@@ -386,6 +401,9 @@ document.addEventListener("DOMContentLoaded", () => {
                     } else {
                         try {
                             localStorage.setItem("spotiless_linked_playlist", playlistMatch[1]);
+                            if (data.user_id) {
+                                localStorage.setItem("spotiless_linked_user", data.user_id);
+                            }
                         } catch (e) {}
                     }
 
@@ -654,7 +672,7 @@ document.addEventListener("DOMContentLoaded", () => {
         } catch (e) {}
 
         if (!linkedUser) return false;
-        if (!force && schema === "v1.4.5") return false;
+        if (!force && schema === "v1.4.6") return false;
         if (refreshPlaylistsInFlight) return refreshPlaylistsInFlight;
 
         refreshPlaylistsInFlight = (async () => {
@@ -665,9 +683,19 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (!data || !data.success || !Array.isArray(data.playlists) || !data.playlists.length) {
                     return false;
                 }
+                let existing = [];
                 try {
-                    localStorage.setItem("spotiless_public_playlists", JSON.stringify(data.playlists));
-                    localStorage.setItem("spotiless_playlists_schema", "v1.4.5");
+                    const parsed = JSON.parse(localStorage.getItem("spotiless_public_playlists") || "[]");
+                    if (Array.isArray(parsed)) existing = parsed;
+                } catch (e) {}
+                const mergedMap = new Map();
+                existing.forEach((p) => { if (p && p.id) mergedMap.set(p.id, p); });
+                data.playlists.forEach((p) => { if (p && p.id) mergedMap.set(p.id, p); });
+                const mergedPlaylists = Array.from(mergedMap.values());
+                data.playlists = mergedPlaylists;
+                try {
+                    localStorage.setItem("spotiless_public_playlists", JSON.stringify(mergedPlaylists));
+                    localStorage.setItem("spotiless_playlists_schema", "v1.4.6");
                     if (Array.isArray(data.tracks) && data.tracks.length && localStorage.getItem("spotiless_custom_cloud_tracks")) {
                         const curPoolName = localStorage.getItem("spotiless_custom_pool_name") || "";
                         if (!curPoolName || curPoolName.includes("Public Playlists")) {
