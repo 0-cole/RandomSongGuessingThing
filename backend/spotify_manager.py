@@ -4,6 +4,7 @@
 # 2. Invariant: Maintain Librespot core monkey patches, Shannon cipher loop, and port 4070 resilience.
 # 3. Strict Fast-Path Budget: Capped at 1–2 tool calls per declared target file.
 # ---------------------------------------------------------------------------
+import re
 import os
 import io
 import glob
@@ -11,6 +12,7 @@ import json
 import time
 import struct
 import base64
+import urllib.parse
 import logging
 import threading
 import concurrent.futures
@@ -433,11 +435,30 @@ class SpotifyManager:
             uname = (
                 self.session.username()
                 if self.session
-                else (self.playback_grant.get("username") if self.playback_grant else "31leppthj2runlbv3x6juui65bpa")
+                else (self.playback_grant.get("username") if self.playback_grant else "spotify_user")
             )
+            display_name = uname
+            try:
+                if uname and uname != "spotify_user":
+                    ssr_res = requests.get(
+                        f"https://open.spotify.com/user/{urllib.parse.quote(uname)}",
+                        headers={"User-Agent": "curl/8.4.0", "Accept": "text/html"},
+                        timeout=5,
+                    )
+                    if ssr_res.status_code == 200:
+                        m = re.search(r'<script[^>]*id="initialState"[^>]*>([\s\S]*?)</script>', ssr_res.text)
+                        if m:
+                            st = json.loads(base64.b64decode(m.group(1).strip()).decode("utf-8"))
+                            items = (st.get("entities") or {}).get("items") or {}
+                            uobj = items.get(f"spotify:user:{uname}")
+                            if uobj and uobj.get("name"):
+                                display_name = uobj.get("name")
+            except Exception as e:
+                logger.debug("Public SSR profile name lookup skipped: %s", e)
+
             self.user_profile = {
                 "id": uname,
-                "display_name": "cole.__" if uname == "31leppthj2runlbv3x6juui65bpa" else uname,
+                "display_name": display_name,
                 "product": "premium",
             }
 
@@ -541,8 +562,12 @@ class SpotifyManager:
         return self.fetch_top_tracks(time_range="short_term", limit=limit)
 
     def fetch_playlists(self) -> List[Dict[str, Any]]:
-        """Fetch list of user's playlists (with offline Spotifast cache fallback)"""
-        my_id = (self.user_profile.get("id") if self.user_profile else None) or "31leppthj2runlbv3x6juui65bpa"
+        """Fetch list of user's playlists (Web API -> spclient profile -> offline Spotifast cache)"""
+        my_id = (
+            (self.session.username() if self.session else None)
+            or (self.user_profile.get("id") if self.user_profile else None)
+            or (self.playback_grant.get("username") if self.playback_grant else None)
+        )
         token = self.get_access_token()
         playlists = []
 
@@ -560,13 +585,49 @@ class SpotifyManager:
                             "tracks_count": p.get("items", {}).get("total")
                             or (p.get("tracks") or {}).get("total", 0),
                             "image": p.get("images", [{}])[0].get("url") if p.get("images") else None,
-                            "is_mine": (owner_id == my_id or owner_id == "31leppthj2runlbv3x6juui65bpa"),
+                            "is_mine": bool(my_id and owner_id == my_id),
                             "owner_name": p.get("owner", {}).get("display_name", ""),
                         })
                     if playlists:
                         return playlists
             except Exception as e:
-                logger.debug("Online playlist fetch failed: %s, using Spotifast library cache", e)
+                logger.debug("Online playlist fetch failed: %s, trying spclient profile view", e)
+
+            if my_id and my_id != "spotify_user":
+                try:
+                    sp_url = (
+                        f"https://spclient.wg.spotify.com/user-profile-view/v3/profile/"
+                        f"{urllib.parse.quote(my_id)}?playlist_limit=50&artist_limit=10&episode_limit=10&market=US"
+                    )
+                    sp_res = requests.get(
+                        sp_url,
+                        headers={
+                            "Authorization": f"Bearer {token}",
+                            "Accept": "application/json",
+                            "App-Platform": "Win32-x86_64",
+                        },
+                        timeout=6,
+                    )
+                    if sp_res.status_code == 200:
+                        for p in sp_res.json().get("public_playlists", []):
+                            uri = p.get("uri", "")
+                            pid = uri.split(":")[-1] if ":" in uri else ""
+                            owner_uri = p.get("owner_uri", "")
+                            owner_id = owner_uri.split(":")[-1] if ":" in owner_uri else ""
+                            if not pid:
+                                continue
+                            playlists.append({
+                                "id": pid,
+                                "name": p.get("name", "Playlist"),
+                                "tracks_count": p.get("followers_count") or 0,
+                                "image": p.get("image_url") if str(p.get("image_url", "")).startswith("http") else None,
+                                "is_mine": bool(not owner_id or owner_id == my_id),
+                                "owner_name": p.get("owner_name", ""),
+                            })
+                        if playlists:
+                            return playlists
+                except Exception as e:
+                    logger.debug("spclient profile playlist fetch failed: %s, using Spotifast library cache", e)
 
         cache_files = glob.glob(os.path.join(BASE_DIR, "spotifast", "spotifast-data", "cache", "library", "*.json"))
         for cf in cache_files:
@@ -581,7 +642,7 @@ class SpotifyManager:
                         "name": p.get("name"),
                         "tracks_count": p.get("items", {}).get("total") or (p.get("tracks") or {}).get("total", 0),
                         "image": p.get("images", [{}])[0].get("url") if p.get("images") else None,
-                        "is_mine": (owner_id == my_id or owner_id == "31leppthj2runlbv3x6juui65bpa"),
+                        "is_mine": bool(my_id and owner_id == my_id),
                         "owner_name": p.get("owner", {}).get("display_name", ""),
                     })
                 if playlists:

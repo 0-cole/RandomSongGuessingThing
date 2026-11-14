@@ -2266,6 +2266,10 @@ body.light-theme .update-banner {
 }
 
 .btn-update-reload {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
     background: var(--color-spotify);
     color: #000;
     font-size: 0.78rem;
@@ -2277,6 +2281,15 @@ body.light-theme .update-banner {
     box-shadow: 0 0 10px rgba(29, 185, 84, 0.35);
     transition: transform 0.15s ease, background 0.15s ease;
     white-space: nowrap;
+}
+
+.btn-update-reload svg {
+    flex-shrink: 0;
+    transition: transform 0.4s ease;
+}
+
+.btn-update-reload:hover svg {
+    transform: rotate(180deg);
 }
 
 .btn-update-reload:hover {
