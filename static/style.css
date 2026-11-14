@@ -2168,8 +2168,186 @@ body.light-theme kbd {
     pointer-events: none !important;
 }
 
+/* ----------------- Gentle Website Update Notification ----------------- */
+.update-banner {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    max-width: 400px;
+    width: calc(100% - 48px);
+    background: rgba(26, 29, 31, 0.96);
+    border: 1px solid rgba(29, 185, 84, 0.45);
+    border-radius: var(--radius-md);
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6), 0 0 20px rgba(29, 185, 84, 0.2);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    z-index: 10050;
+    pointer-events: auto;
+    transition: opacity 0.3s ease, transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    animation: updateSlideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+body.light-theme .update-banner {
+    background: rgba(255, 255, 255, 0.96);
+    border: 1px solid rgba(29, 185, 84, 0.5);
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.15), 0 0 20px rgba(29, 185, 84, 0.15);
+}
+
+.update-banner.hidden {
+    display: none !important;
+}
+
+.update-banner.hiding {
+    opacity: 0 !important;
+    transform: translateY(16px) scale(0.96) !important;
+    pointer-events: none !important;
+}
+
+.update-banner-content {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+}
+
+.update-banner-icon {
+    position: relative;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: rgba(29, 185, 84, 0.15);
+    border: 1px solid rgba(29, 185, 84, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    flex-shrink: 0;
+}
+
+.update-pulse-dot {
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--color-spotify);
+    box-shadow: 0 0 8px var(--color-spotify);
+    animation: updatePulse 1.8s infinite ease-in-out;
+}
+
+.update-banner-text {
+    flex: 1;
+    min-width: 0;
+    text-align: left;
+}
+
+.update-banner-title {
+    font-size: 0.84rem;
+    font-weight: 800;
+    color: var(--color-text);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.update-banner-desc {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+    line-height: 1.35;
+    margin-top: 2px;
+}
+
+.update-banner-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.btn-update-reload {
+    background: var(--color-spotify);
+    color: #000;
+    font-size: 0.78rem;
+    font-weight: 800;
+    padding: 6px 13px;
+    border-radius: var(--radius-full);
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 0 10px rgba(29, 185, 84, 0.35);
+    transition: transform 0.15s ease, background 0.15s ease;
+    white-space: nowrap;
+}
+
+.btn-update-reload:hover {
+    background: var(--color-spotify-hover);
+    transform: scale(1.05);
+}
+
+.btn-update-reload:active {
+    transform: scale(0.96);
+}
+
+.btn-update-dismiss {
+    background: none;
+    border: none;
+    color: var(--color-text-subtle);
+    font-size: 1.25rem;
+    line-height: 1;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.15s ease;
+}
+
+.btn-update-dismiss:hover {
+    color: var(--color-text);
+}
+
+@keyframes updateSlideUp {
+    0% {
+        opacity: 0;
+        transform: translateY(20px) scale(0.95);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@keyframes updatePulse {
+    0%, 100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+    50% {
+        transform: scale(1.4);
+        opacity: 0.6;
+    }
+}
+
 /* Mobile & iOS Safari WebKit compositor / post-screenshot touch safety */
 @media (max-width: 768px), (hover: none) and (pointer: coarse) {
+    .update-banner {
+        bottom: 16px;
+        right: 14px;
+        left: 14px;
+        width: auto;
+        max-width: none;
+        margin: 0 auto;
+    }
+
+    .update-banner-content {
+        padding: 10px 12px;
+        gap: 10px;
+    }
+
+    .update-banner-desc {
+        font-size: 0.72rem;
+    }
     body::before {
         animation: none !important;
         will-change: auto !important;

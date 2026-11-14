@@ -32,7 +32,7 @@
             } catch (e) {}
         })();
     </script>
-    <link rel="stylesheet" href="style.css?v=1.4.5">
+    <link rel="stylesheet" href="style.css?v=1.4.6">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400..800;1,9..40,400..800&family=Poppins:wght@600;700;800;900&display=swap" rel="stylesheet">
@@ -654,7 +654,25 @@
     <!-- Toast Notification -->
     <div id="toast" class="toast hidden">Copied score to clipboard!</div>
 
-    <script src="audio_player.js?v=1.4.5"></script>
-    <script src="app.js?v=1.4.5"></script>
+    <!-- Gentle Update Notification Banner (Bottom-Right / Mobile Floating) -->
+    <div id="update-banner" class="update-banner hidden" role="alert" aria-live="polite">
+        <div class="update-banner-content">
+            <div class="update-banner-icon">
+                <span class="update-pulse-dot"></span>
+                <span>✨</span>
+            </div>
+            <div class="update-banner-text">
+                <div class="update-banner-title">Website Updated</div>
+                <div class="update-banner-desc">Spoti-Less was updated. You can reload safely without losing your streak or guessed songs!</div>
+            </div>
+            <div class="update-banner-actions">
+                <button id="btn-update-reload" class="btn-update-reload" title="Reload Spoti-Less">Reload</button>
+                <button id="btn-update-dismiss" class="btn-update-dismiss" title="Dismiss" aria-label="Dismiss">&times;</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="audio_player.js?v=1.4.6"></script>
+    <script src="app.js?v=1.4.6"></script>
 </body>
 </html>

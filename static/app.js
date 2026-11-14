@@ -10,7 +10,9 @@
  */
 
 document.addEventListener("DOMContentLoaded", () => {
-    // Audio Engine
+    // Current App Version & Audio Engine
+    const CURRENT_APP_VERSION = "v1.4.6";
+    window.__CURRENT_APP_VERSION__ = CURRENT_APP_VERSION;
     const audio = new window.MicroAudioEngine();
 
     // DOM Elements
@@ -745,7 +747,26 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (savedIdx !== null) this.currentIndex = parseInt(savedIdx, 10) || 0;
             } catch (e) {}
 
-            this.resetRound();
+            try {
+                const savedRound = localStorage.getItem("spotiless_cloud_active_round");
+                if (savedRound) {
+                    const parsed = JSON.parse(savedRound);
+                    const curTrack = this.getCurrentTrack();
+                    if (parsed && parsed.currentIndex === this.currentIndex && (!parsed.trackId || (curTrack && parsed.trackId === curTrack.id))) {
+                        this.attemptIndex = typeof parsed.attemptIndex === "number" ? parsed.attemptIndex : 0;
+                        this.guesses = Array.isArray(parsed.guesses) ? parsed.guesses : [];
+                        this.isWon = !!parsed.isWon;
+                        this.isOver = !!parsed.isOver;
+                    } else {
+                        this.resetRound();
+                    }
+                } else {
+                    this.resetRound();
+                }
+            } catch (e) {
+                this.resetRound();
+            }
+
             await refreshLinkedUserPlaylistsIfNeeded(false);
         },
 
@@ -799,11 +820,32 @@ document.addEventListener("DOMContentLoaded", () => {
             } catch (e) {}
         },
 
+        saveActiveRound: function() {
+            try {
+                if (!this.isOver && Array.isArray(this.guesses) && this.guesses.length > 0) {
+                    const curTrack = this.getCurrentTrack();
+                    localStorage.setItem("spotiless_cloud_active_round", JSON.stringify({
+                        currentIndex: this.currentIndex,
+                        attemptIndex: this.attemptIndex,
+                        guesses: this.guesses,
+                        isWon: this.isWon,
+                        isOver: this.isOver,
+                        trackId: curTrack ? curTrack.id : ""
+                    }));
+                } else {
+                    localStorage.removeItem("spotiless_cloud_active_round");
+                }
+            } catch (e) {}
+        },
+
         resetRound: function() {
             this.attemptIndex = 0;
             this.guesses = [];
             this.isWon = false;
             this.isOver = false;
+            try {
+                localStorage.removeItem("spotiless_cloud_active_round");
+            } catch (e) {}
         },
 
         getCurrentTrack: function() {
@@ -901,6 +943,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
             }
 
+            this.saveActiveRound();
             return this.getState();
         },
 
@@ -923,6 +966,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 this.saveStats();
             }
 
+            this.saveActiveRound();
             return this.getState();
         },
 
@@ -932,6 +976,7 @@ document.addEventListener("DOMContentLoaded", () => {
             this.stats.played++;
             this.stats.current_streak = 0;
             this.saveStats();
+            this.saveActiveRound();
             return this.getState();
         },
 
@@ -1283,10 +1328,8 @@ document.addEventListener("DOMContentLoaded", () => {
             const data = await res.json();
 
             if (data.version) {
-                if (window.__CURRENT_APP_VERSION__ && window.__CURRENT_APP_VERSION__ !== data.version) {
-                    console.log("New app version detected, reloading...");
-                    window.location.reload();
-                    return;
+                if (data.version !== CURRENT_APP_VERSION) {
+                    showUpdateNotification(data.version);
                 }
                 window.__CURRENT_APP_VERSION__ = data.version;
             }
@@ -2135,10 +2178,8 @@ document.addEventListener("DOMContentLoaded", () => {
             const data = await res.json();
 
             if (data.version) {
-                if (window.__CURRENT_APP_VERSION__ && window.__CURRENT_APP_VERSION__ !== data.version) {
-                    console.log("New app version detected, reloading...");
-                    window.location.reload();
-                    return;
+                if (data.version !== CURRENT_APP_VERSION) {
+                    showUpdateNotification(data.version);
                 }
                 window.__CURRENT_APP_VERSION__ = data.version;
             }
@@ -2214,6 +2255,75 @@ document.addEventListener("DOMContentLoaded", () => {
             clearTimeout(showToast._timer);
         }
         showToast._timer = setTimeout(() => toast.classList.add("hidden"), durationMs);
+    }
+
+    // ----------------- Gentle Website Update Notification System -----------------
+    let isCheckingUpdate = false;
+
+    function showUpdateNotification(newVersion) {
+        const banner = document.getElementById("update-banner");
+        if (!banner) return;
+
+        const dismissedKey = `spotiless_update_dismissed_${newVersion || "latest"}`;
+        if (sessionStorage.getItem(dismissedKey)) {
+            return;
+        }
+
+        banner.classList.remove("hidden", "hiding");
+
+        const btnReload = document.getElementById("btn-update-reload");
+        const btnDismiss = document.getElementById("btn-update-dismiss");
+
+        if (btnReload) {
+            btnReload.onclick = () => {
+                btnReload.textContent = "Reloading...";
+                btnReload.disabled = true;
+                window.location.reload();
+            };
+        }
+
+        if (btnDismiss) {
+            btnDismiss.onclick = (e) => {
+                if (e) e.stopPropagation();
+                banner.classList.add("hiding");
+                setTimeout(() => {
+                    banner.classList.add("hidden");
+                    banner.classList.remove("hiding");
+                }, 320);
+                sessionStorage.setItem(dismissedKey, "1");
+            };
+        }
+    }
+
+    async function checkWebsiteUpdate() {
+        if (isCheckingUpdate) return;
+        isCheckingUpdate = true;
+        try {
+            // Check version.json with anti-cache query
+            const res = await fetch(`version.json?_t=${Date.now()}`, { cache: "no-store" });
+            if (res.ok) {
+                const data = await res.json();
+                if (data && data.version && data.version !== CURRENT_APP_VERSION) {
+                    showUpdateNotification(data.version);
+                    return;
+                }
+            }
+        } catch (e) {
+            // If static fetch fails, fallback to checking /api/status if backend is alive
+            if (!isCloudMode) {
+                try {
+                    const stRes = await fetch(`/api/status?_t=${Date.now()}`);
+                    if (stRes.ok) {
+                        const stData = await stRes.json();
+                        if (stData && stData.version && stData.version !== CURRENT_APP_VERSION) {
+                            showUpdateNotification(stData.version);
+                        }
+                    }
+                } catch (err) {}
+            }
+        } finally {
+            isCheckingUpdate = false;
+        }
     }
 
     // ----------------- Global Event Listeners -----------------
@@ -2300,6 +2410,18 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (window.closePrivacyModal) window.closePrivacyModal();
                 autocompleteList.classList.add("hidden");
             }
+        });
+
+        // Setup automatic update checking
+        setTimeout(checkWebsiteUpdate, 3500);
+        setInterval(checkWebsiteUpdate, 45000);
+        document.addEventListener("visibilitychange", () => {
+            if (document.visibilityState === "visible") {
+                checkWebsiteUpdate();
+            }
+        });
+        window.addEventListener("focus", () => {
+            checkWebsiteUpdate();
         });
     }
 

@@ -1,0 +1,6 @@
+{
+  "version": "v1.4.6",
+  "name": "Spoti-Less",
+  "updated_at": "2026-11-14T03:05:00Z",
+  "changelog": "Gentle update notification and active round & streak persistence on reload."
+}
