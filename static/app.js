@@ -118,13 +118,18 @@ document.addEventListener("DOMContentLoaded", () => {
         currentAuthMode = (mode === "signin") ? "signin" : "signup";
         window.isSignUpMode = (currentAuthMode === "signup");
 
+        const userInput = document.getElementById("acc-username-input") || document.getElementById("auth-username");
+        if (currentAuthMode === "signin" && userInput && userInput.value.trim() && modalAuth && !modalAuth.classList.contains("hidden") && typeof window.handleAccountSubmit === "function") {
+            window.handleAccountSubmit();
+            return;
+        }
+
         const tabSignup = document.getElementById("tab-mode-signup");
         const tabSignin = document.getElementById("tab-mode-signin");
         const formTitle = document.getElementById("form-acc-title") || document.getElementById("auth-form-title");
         const formDesc = document.getElementById("form-acc-desc") || document.getElementById("auth-form-subtitle");
         const btnSubmitAcc = document.getElementById("btn-submit-account") || document.getElementById("btn-auth-submit");
         const toggleLink = document.getElementById("btn-toggle-account-mode");
-        const userInput = document.getElementById("acc-username-input") || document.getElementById("auth-username");
         const passInput = document.getElementById("acc-password-input") || document.getElementById("auth-password");
 
         if (tabSignup && tabSignin) {
@@ -169,6 +174,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
     window.toggleAccountAuthMode = function(e) {
         if (e && e.preventDefault) e.preventDefault();
+        const userInput = document.getElementById("acc-username-input") || document.getElementById("auth-username");
+        if (userInput && userInput.value.trim() && modalAuth && !modalAuth.classList.contains("hidden") && typeof window.handleAccountSubmit === "function") {
+            window.handleAccountSubmit(e);
+            return;
+        }
         window.setAccountMode(currentAuthMode === "signup" ? "signin" : "signup");
     };
 
@@ -180,10 +190,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     window.openAuthModal = function() {
-        if (!modalAuth) return;
-        modalAuth.classList.remove("hidden");
-        checkAccountState();
-        scrollAuthModalToTop();
+        window.location.href = "login.html";
     };
 
     window.closeAuthModalAndPlay = function() {
@@ -325,7 +332,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const hasSpDc = !!getSpotifyCookie();
             renderAccountConnectedView(displayName, hasSpDc);
             checkAccountState();
-            scrollAuthModalToTop();
+            closeModals();
 
             const actionVerb = currentAuthMode === "signin" ? "Signed in" : "Account created";
             showToast(`${actionVerb} as ${displayName}! 🎉`);
@@ -533,6 +540,10 @@ document.addEventListener("DOMContentLoaded", () => {
                     } catch (err) {}
                 }
 
+                const uInput = document.getElementById("acc-username-input");
+                const pInput = document.getElementById("acc-password-input");
+                if (uInput) uInput.value = "";
+                if (pInput) pInput.value = "";
                 window.setAccountMode("signin");
                 checkAccountState();
                 scrollAuthModalToTop();
@@ -1037,7 +1048,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 userPlaylistsStatusMsg.innerHTML = '<p style="margin: 0 0 6px 0; font-weight: 700; color: #fff; font-size: 0.9rem;">Spotify Linked 🍪</p><p style="margin: 0 0 12px 0; font-size: 0.8rem; color: var(--color-text-muted);">Paste any playlist URL above to load songs instantly, or run desktop native mode to sync your created playlists.</p>';
             }
         } else if (userPlaylistsStatusMsg) {
-            userPlaylistsStatusMsg.innerHTML = '<p style="margin: 0 0 6px 0; font-weight: 700; color: #fff; font-size: 0.9rem;">No Spotify Account Linked</p><p style="margin: 0 0 12px 0; font-size: 0.8rem; color: var(--color-text-muted);">Connect your Spotify account to load and play your personal playlists here.</p><button type="button" class="btn btn-primary btn-sm" onclick="document.getElementById(\'modal-mode\').classList.add(\'hidden\'); if(window.openAuthModal){window.openAuthModal();}else{document.getElementById(\'modal-auth\').classList.remove(\'hidden\');}" style="font-weight: 800; font-size: 0.8rem;">🔗 Connect Spotify Account</button>';
+            userPlaylistsStatusMsg.innerHTML = '<p style="margin: 0 0 6px 0; font-weight: 700; color: #fff; font-size: 0.9rem;">No Spotify Account Linked</p><p style="margin: 0 0 12px 0; font-size: 0.8rem; color: var(--color-text-muted);">Connect your Spotify account to load and play your personal playlists here.</p><button type="button" class="btn btn-primary btn-sm" onclick="window.location.href=\'login.html\'" style="font-weight: 800; font-size: 0.8rem;">🔗 Connect Spotify Account</button>';
         }
 
         if (acc && acc.username) {
@@ -1056,12 +1067,6 @@ document.addEventListener("DOMContentLoaded", () => {
             if (unconnected) {
                 unconnected.classList.remove("hidden");
                 unconnected.style.setProperty("display", "block", "important");
-            }
-
-            // First visit prompt if not guest
-            if (!guest && modalAuth && !window.__INITIAL_AUTH_PROMPTED__) {
-                window.__INITIAL_AUTH_PROMPTED__ = true;
-                modalAuth.classList.remove("hidden");
             }
         }
     }

@@ -18,7 +18,7 @@
 
 ## 1. Executive Summary & High-Level Objective
 - **Project**: Spotiless (Songless — Spotify Edition), an endless music guessing game inspired by *Songless* (Lessgames) with microsecond-accurate snippet intervals (0.1s → 0.25s → 0.5s → 1.0s → 2.0s → 5.0s).
-- **Current Version**: `v1.4.2` (Unified GitHub Cloud & Local Native Release)
+- **Current Version**: `v1.4.3` (Unified GitHub Cloud & Local Native Release)
 - **Official Branding**: **Spoti-Less** in-app / **Spotiless** for domain and repository links.
 - **Dual Architecture**:
   1. **Desktop Native Mode (`launcher.py` / `127.0.0.1:4321`)**: 100% Native Spotify Shannon cipher streaming over TCP port 4070 (`ap-gae2.spotify.com:4070`) using cached Librespot playback tokens and personal Spotify user libraries. Works even through school firewalls and FortiGuard blocks.
@@ -44,16 +44,14 @@
   - Ubiquitous Terms of Service & Privacy Policy modal (`#modal-privacy`) accessible via top navigation shield button (`#btn-nav-privacy`) and footer.
   - Data deletion copy preserved; wipe button earmarked for upcoming Settings menu.
 
-## 3. Recent Modifications & Verified State (`v1.4.2`)
-- [`backend/app.py`](file:///d:/DOWNLOAD/RandomSongGuessingThing/backend/app.py): Bumped version to `v1.4.2`.
-- [`static/index.html`](file:///d:/DOWNLOAD/RandomSongGuessingThing/static/index.html):
-  - Wired `#form-local-account` (`onsubmit`) and `#btn-submit-account` (`onclick`) directly to `window.handleAccountSubmit(event)` with `novalidate` so mobile & PC taps never fail silently.
-  - Added prominent `#btn-start-playing-connected` (`▶ Start Playing Now`) CTA in `#auth-connected-view` and mobile/PC playlist link + `sp_dc` cookie support in `#account-spotify-link-box`.
-  - Bumped cache busters to `?v=1.4.2`.
-- [`static/app.js`](file:///d:/DOWNLOAD/RandomSongGuessingThing/static/app.js):
-  - Defined missing `escapeHtml()` helper (previously threw `ReferenceError: escapeHtml is not defined` inside `renderAccountConnectedView()`, breaking "Sign In & Play" / "Create Permanent Account & Play").
-  - Consolidated duplicate/conflicting auth listeners into one unified controller (`window.handleAccountSubmit`, `window.openAuthModal`, `window.closeAuthModalAndPlay`, `checkAccountState`, `handleSpotifyLinkInput`), syncing `spotiless_account`, `spotiless_account_name`, and `spotiless_username` consistently.
-  - Added null guards for DOM references and Cloud Mode handling in `openModeModal()` / custom playlist loader.
+## 3. Recent Modifications & Verified State (`v1.4.3`)
+- [`static/login.html`](file:///d:/DOWNLOAD/RandomSongGuessingThing/static/login.html): Dedicated standalone Sign In, Create Account, and Spotify Connect page (`/login` & `/login.html`) with zero modal overlays, working on both mobile and desktop Vercel deployments.
+- [`vercel.json`](file:///d:/DOWNLOAD/RandomSongGuessingThing/vercel.json) & [`backend/app.py`](file:///d:/DOWNLOAD/RandomSongGuessingThing/backend/app.py): Added `/login` route/rewrite and bumped version to `v1.4.3`.
+- [`static/index.html`](file:///d:/DOWNLOAD/RandomSongGuessingThing/static/index.html) & [`static/app.js`](file:///d:/DOWNLOAD/RandomSongGuessingThing/static/app.js):
+  - Updated `#btn-open-auth` and `window.openAuthModal()` to navigate directly to `login.html`.
+  - Removed auto-popping `#modal-auth` on initial page load so new visitors can play immediately.
+  - Raised `.toast` `z-index` to `10000` and enabled `.modal-card` vertical scrolling in [`static/style.css`](file:///d:/DOWNLOAD/RandomSongGuessingThing/static/style.css).
+  - Bumped asset cache busters to `?v=1.4.3`.
 
 ## 4. Immediate Next Steps
 - Full unified gameplay verified across both Local Desktop launcher and Cloud Vercel deployment.

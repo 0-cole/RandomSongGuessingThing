@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<!--
+   ⚠️ HEY AI AGENT! Editing this markup?
+   1. Stop! Read spotiless_context.md & rules first!
+   2. Strict Fast-Path Budget: Capped at 1–2 tool calls total (Read -> Edit -> Done).
+   3. DO NOT wander or do incremental reads. Make direct edits cleanly.
+-->
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>Sign In &amp; Connect Spotify — Spoti-Less</title>
+    <script>
+        (function() {
+            try {
+                if (localStorage.getItem("spotiless_theme") === "light") {
+                    document.documentElement.classList.add("light-theme");
+                }
+            } catch (e) {}
+        })();
+    </script>
+    <link rel="stylesheet" href="style.css?v=1.4.3">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400..800;1,9..40,400..800&family=Poppins:wght@600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        .login-page-stack {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            margin-top: 18px;
+            width: 100%;
+        }
+        .login-card {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            padding: 20px;
+            box-shadow: var(--shadow-soft);
+            text-align: left;
+        }
+        .login-card h2 {
+            font-family: var(--font-heading);
+            font-size: 1.15rem;
+            font-weight: 800;
+            margin: 0 0 6px 0;
+        }
+        .login-card .subtitle {
+            font-size: 0.84rem;
+            color: var(--color-text-muted);
+            line-height: 1.45;
+            margin: 0 0 14px 0;
+        }
+        .login-input {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 12px 14px;
+            font-size: 16px;
+            background: var(--bg-surface-elevated);
+            border: 1px solid var(--border-color);
+            color: var(--color-text);
+            border-radius: var(--radius-sm);
+            outline: none;
+            user-select: text !important;
+            -webkit-user-select: text !important;
+        }
+        .login-input:focus {
+            border-color: var(--color-spotify);
+            box-shadow: 0 0 0 2px rgba(29, 185, 84, 0.2);
+        }
+        .login-field-label {
+            display: block;
+            font-size: 0.78rem;
+            font-weight: 700;
+            margin-bottom: 6px;
+            color: var(--color-text-muted);
+        }
+        .login-status-banner {
+            padding: 10px 12px;
+            border-radius: var(--radius-sm);
+            font-size: 0.84rem;
+            font-weight: 600;
+            margin-bottom: 12px;
+            line-height: 1.4;
+        }
+        .login-status-banner.error {
+            background: rgba(226, 80, 80, 0.16);
+            border: 1px solid rgba(226, 80, 80, 0.45);
+            color: #ff8080;
+        }
+        .login-status-banner.success {
+            background: rgba(29, 185, 84, 0.16);
+            border: 1px solid rgba(29, 185, 84, 0.45);
+            color: #1ed760;
+        }
+        .mode-switcher {
+            display: flex;
+            background: var(--bg-surface-elevated);
+            padding: 4px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border-color);
+            margin-bottom: 14px;
+            gap: 4px;
+        }
+        .mode-switcher button {
+            flex: 1;
+            padding: 10px 12px;
+            font-size: 0.85rem;
+            font-weight: 800;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        .btn-row-stack {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 6px;
+        }
+        .profile-summary-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+        .spotify-pill-badge {
+            font-size: 0.74rem;
+            padding: 3px 9px;
+            border-radius: 9999px;
+            font-weight: 800;
+            display: inline-block;
+        }
+    </style>
+</head>
+<body class="dark-theme">
+    <script>
+        (function() {
+            try {
+                if (localStorage.getItem("spotiless_theme") === "light") {
+                    document.body.classList.remove("dark-theme");
+                    document.body.classList.add("light-theme");
+                }
+            } catch (e) {}
+        })();
+    </script>
+
+    <div class="app-layout">
+        <header class="navbar">
+            <div class="nav-left">
+                <a href="index.html" class="nav-pill" style="text-decoration: none;">
+                    <span>&larr; Back to Game</span>
+                </a>
+            </div>
+            <div class="nav-center">
+                <h1 class="logo">SPOTI-LESS</h1>
+            </div>
+            <div class="nav-right">
+                <a href="index.html" class="nav-pill" style="text-decoration: none; border-color: rgba(29,185,84,0.45); color: var(--color-spotify);">
+                    <span>&#9654; Play</span>
+                </a>
+            </div>
+        </header>
+
+        <main class="login-page-stack">
+            <!-- Signed-in Profile Card (shown when already logged in) -->
+            <section id="login-connected-card" class="login-card hidden">
+                <div class="profile-summary-row">
+                    <img src="https://i.scdn.co/image/ab6775700000ee853df25b81110cd06e8f62f064" alt="Avatar" class="avatar-img" style="width: 48px; height: 48px; border-radius: 50%;">
+                    <div style="flex: 1; min-width: 0;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap;">
+                            <h2 id="connected-username" style="margin: 0; word-break: break-word;">Player</h2>
+                            <button type="button" id="btn-edit-username" class="btn btn-secondary btn-xs">&#9999;&#65039; Edit</button>
+                        </div>
+                        <div style="margin-top: 6px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                            <span id="connected-spotify-pill" class="spotify-pill-badge" style="background: rgba(255, 107, 107, 0.2); color: #ff6b6b;">Not Linked</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Inline Edit Username Box -->
+                <div id="edit-username-box" class="hidden" style="background: var(--bg-surface-elevated); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); margin-bottom: 14px;">
+                    <label class="login-field-label" for="input-edit-username">New Username</label>
+                    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                        <input type="text" id="input-edit-username" class="login-input" style="flex: 1; min-width: 160px; padding: 9px 12px;" placeholder="Enter new username">
+                        <button type="button" id="btn-save-username" class="btn btn-primary" style="height: 42px; padding: 0 16px;">Save</button>
+                        <button type="button" id="btn-cancel-username" class="btn btn-secondary" style="height: 42px; padding: 0 14px;">Cancel</button>
+                    </div>
+                </div>
+
+                <div class="btn-row-stack">
+                    <a href="index.html" id="btn-continue-game" class="btn btn-primary btn-full btn-glow" style="text-decoration: none; font-weight: 800;">
+                        &#9654; Continue to Game
+                    </a>
+                    <button type="button" id="btn-sign-out" class="btn btn-secondary btn-full btn-danger">
+                        Sign Out / Switch Account
+                    </button>
+                </div>
+            </section>
+
+            <!-- Sign In / Create Account Card -->
+            <section id="login-form-card" class="login-card">
+                <div class="mode-switcher">
+                    <button type="button" id="tab-signin" onclick="handleModeTab('signin')" style="background: var(--color-spotify); color: #000;">
+                        &#128273; Sign In
+                    </button>
+                    <button type="button" id="tab-signup" onclick="handleModeTab('signup')" style="background: transparent; color: var(--color-text-muted);">
+                        &#10024; Create Account
+                    </button>
+                </div>
+
+                <h2 id="login-card-title">Sign In &amp; Play</h2>
+                <p id="login-card-subtitle" class="subtitle">
+                    Enter your username or email to restore your streaks and session on this device, then jump straight into the game.
+                </p>
+
+                <div id="login-status-msg" class="login-status-banner hidden"></div>
+
+                <form id="standalone-login-form" onsubmit="return submitLoginForm(event);" novalidate style="display: flex; flex-direction: column; gap: 12px;">
+                    <div>
+                        <label class="login-field-label" for="login-username">Username or Email</label>
+                        <input type="text" id="login-username" class="login-input" placeholder="Enter your username or email" autocomplete="username">
+                    </div>
+
+                    <div>
+                        <label class="login-field-label" for="login-password">Password <span style="font-weight: 400; color: var(--color-text-subtle);">(optional)</span></label>
+                        <input type="password" id="login-password" class="login-input" placeholder="Enter password (optional)" autocomplete="current-password">
+                    </div>
+
+                    <div>
+                        <label class="login-field-label" for="login-spotify-input">Spotify Playlist Link or <code>sp_dc</code> Cookie <span style="font-weight: 400; color: var(--color-text-subtle);">(optional)</span></label>
+                        <input type="text" id="login-spotify-input" class="login-input" placeholder="Paste open.spotify.com/playlist/... or sp_dc cookie">
+                    </div>
+
+                    <div class="btn-row-stack">
+                        <button type="submit" id="btn-signin-play" class="btn btn-primary btn-full btn-glow" style="font-weight: 800;">
+                            &#128273; Sign In &amp; Play
+                        </button>
+                        <button type="button" id="btn-create-play" class="btn btn-secondary btn-full" onclick="submitLoginForm(event, 'signup')" style="font-weight: 700;">
+                            &#10024; Create Account &amp; Play
+                        </button>
+                    </div>
+                </form>
+            </section>
+
+            <!-- Connect Spotify Card (Mobile & PC) -->
+            <section id="spotify-connect-card" class="login-card">
+                <h2>&#127925; Connect Spotify (Mobile &amp; PC)</h2>
+                <p class="subtitle">
+                    Paste any Spotify playlist link from your phone or PC, or paste your <code>sp_dc</code> cookie from desktop Chrome/Edge.
+                </p>
+
+                <div id="spotify-status-msg" class="login-status-banner hidden"></div>
+
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                    <input type="text" id="spotify-link-field" class="login-input" placeholder="https://open.spotify.com/playlist/... or sp_dc cookie">
+                    <button type="button" id="btn-link-spotify-play" class="btn btn-primary btn-full" onclick="connectSpotifyAndPlay()" style="font-weight: 800;">
+                        &#127925; Link Spotify &amp; Play
+                    </button>
+                    <button type="button" id="btn-unlink-spotify-page" class="btn btn-secondary btn-full hidden" onclick="unlinkSpotifyOnPage()" style="color: #ff6b6b;">
+                        Unlink Spotify
+                    </button>
+                </div>
+
+                <details style="margin-top: 12px; font-size: 0.78rem; color: var(--color-text-muted); background: var(--bg-surface-elevated); border-radius: var(--radius-sm); padding: 10px 12px; border: 1px solid var(--border-color);">
+                    <summary style="cursor: pointer; font-weight: 700; color: var(--color-spotify);">How to copy a playlist link or sp_dc cookie?</summary>
+                    <ol style="margin: 8px 0 0 18px; padding: 0; line-height: 1.55;">
+                        <li><strong>Mobile &amp; PC (Playlist Link):</strong> Open Spotify &rarr; go to a playlist &rarr; tap <strong>Share &rarr; Copy Link</strong>, then paste it above. <em>(Note: Live personal Spotify streaming runs on the Desktop Native app; the Vercel web site plays Cloud Top Hits.)</em></li>
+                        <li><strong>PC Desktop (<code>sp_dc</code> Cookie):</strong> Sign in at <a href="https://open.spotify.com" target="_blank" rel="noopener noreferrer" style="color: var(--color-spotify); text-decoration: underline;">open.spotify.com</a>, press <kbd>F12</kbd> &rarr; <strong>Application &gt; Cookies</strong> &rarr; copy <code>sp_dc</code>.</li>
+                    </ol>
+                </details>
+            </section>
+
+            <!-- Play Free as Guest -->
+            <section class="login-card" style="padding: 16px 20px;">
+                <button type="button" id="btn-guest-play" class="btn btn-secondary btn-full" onclick="playAsGuest()" style="font-weight: 800;">
+                    &#9654; Play Free as Guest (50+ Top Hits)
+                </button>
+            </section>
+        </main>
+
+        <footer class="page-footnote">
+            <span>Spoti-Less &bull; Fan-made Spotify trivia</span>
+            <span class="footnote-sep">&bull;</span>
+            <a href="index.html" class="footer-legal-link">Return to Game</a>
+        </footer>
+    </div>
+
+    <div id="toast" class="toast hidden"></div>
+
+    <script>
+        (function() {
+            let activeMode = "signin";
+
+            function showBanner(elId, msg, isError) {
+                const el = document.getElementById(elId);
+                if (!el) return;
+                el.textContent = msg;
+                el.className = "login-status-banner " + (isError ? "error" : "success");
+                el.classList.remove("hidden");
+            }
+
+            function showToast(msg) {
+                const toast = document.getElementById("toast");
+                if (!toast) return;
+                toast.textContent = msg;
+                toast.classList.remove("hidden");
+                setTimeout(() => toast.classList.add("hidden"), 2500);
+            }
+
+            function getStoredAccount() {
+                try {
+                    const raw = localStorage.getItem("spotiless_account");
+                    if (raw) {
+                        const parsed = JSON.parse(raw);
+                        if (parsed && (parsed.username || parsed.email || parsed.raw_input)) {
+                            return parsed;
+                        }
+                    }
+                } catch (e) {}
+                const fallbackName = localStorage.getItem("spotiless_account_name") || localStorage.getItem("spotiless_username");
+                const fallbackEmail = localStorage.getItem("spotiless_account_email") || "";
+                if (fallbackName) {
+                    return {
+                        username: fallbackName.includes("@") ? fallbackName.split("@")[0].trim() : fallbackName,
+                        email: fallbackEmail || (fallbackName.includes("@") ? fallbackName : ""),
+                        raw_input: fallbackName
+                    };
+                }
+                return null;
+            }
+
+            function getSpotifyCookie() {
+                return localStorage.getItem("spotiless_sp_dc") || localStorage.getItem("sp_dc") || "";
+            }
+
+            function saveSpotifyInput(raw) {
+                const trimmed = (raw || "").trim();
+                if (!trimmed) return false;
+                const playlistMatch = trimmed.match(/(?:open\.spotify\.com\/playlist\/|spotify:playlist:)([a-zA-Z0-9]+)/i);
+                if (playlistMatch) {
+                    localStorage.setItem("spotiless_linked_playlist", playlistMatch[1]);
+                    return "playlist";
+                }
+                const cookieMatch = trimmed.match(/sp_dc=([a-zA-Z0-9_\-]+)/);
+                const cookieVal = cookieMatch ? cookieMatch[1] : trimmed;
+                localStorage.setItem("spotiless_sp_dc", cookieVal);
+                localStorage.setItem("sp_dc", cookieVal);
+                return "cookie";
+            }
+
+            function syncView() {
+                const acc = getStoredAccount();
+                const hasCookie = !!getSpotifyCookie();
+                const linkedPlaylist = localStorage.getItem("spotiless_linked_playlist");
+
+                const connectedCard = document.getElementById("login-connected-card");
+                const formCard = document.getElementById("login-form-card");
+                const nameEl = document.getElementById("connected-username");
+                const pillEl = document.getElementById("connected-spotify-pill");
+                const unlinkBtn = document.getElementById("btn-unlink-spotify-page");
+                const userInput = document.getElementById("login-username");
+
+                if (acc && acc.username) {
+                    if (connectedCard) connectedCard.classList.remove("hidden");
+                    if (formCard) formCard.classList.add("hidden");
+                    if (nameEl) nameEl.textContent = acc.username;
+                    if (userInput && !userInput.value) userInput.value = acc.raw_input || acc.email || acc.username;
+                } else {
+                    if (connectedCard) connectedCard.classList.add("hidden");
+                    if (formCard) formCard.classList.remove("hidden");
+                }
+
+                if (pillEl) {
+                    if (hasCookie) {
+                        pillEl.textContent = "✓ Spotify Cookie Linked";
+                        pillEl.style.background = "rgba(29, 185, 84, 0.2)";
+                        pillEl.style.color = "#1ed760";
+                    } else if (linkedPlaylist) {
+                        pillEl.textContent = "✓ Playlist Saved";
+                        pillEl.style.background = "rgba(29, 185, 84, 0.2)";
+                        pillEl.style.color = "#1ed760";
+                    } else {
+                        pillEl.textContent = "Not Linked";
+                        pillEl.style.background = "rgba(255, 107, 107, 0.2)";
+                        pillEl.style.color = "#ff6b6b";
+                    }
+                }
+
+                if (unlinkBtn) {
+                    if (hasCookie || linkedPlaylist) unlinkBtn.classList.remove("hidden");
+                    else unlinkBtn.classList.add("hidden");
+                }
+            }
+
+            window.handleModeTab = function(mode) {
+                const userInput = document.getElementById("login-username");
+                const typed = (userInput ? userInput.value : "").trim();
+                if (typed && mode === activeMode) {
+                    window.submitLoginForm(null, mode);
+                    return;
+                }
+                activeMode = mode === "signup" ? "signup" : "signin";
+                const tabSignin = document.getElementById("tab-signin");
+                const tabSignup = document.getElementById("tab-signup");
+                const title = document.getElementById("login-card-title");
+                if (tabSignin && tabSignup) {
+                    if (activeMode === "signin") {
+                        tabSignin.style.background = "var(--color-spotify)";
+                        tabSignin.style.color = "#000";
+                        tabSignup.style.background = "transparent";
+                        tabSignup.style.color = "var(--color-text-muted)";
+                        if (title) title.textContent = "Sign In & Play";
+                    } else {
+                        tabSignup.style.background = "var(--color-spotify)";
+                        tabSignup.style.color = "#000";
+                        tabSignin.style.background = "transparent";
+                        tabSignin.style.color = "var(--color-text-muted)";
+                        if (title) title.textContent = "Create Account & Play";
+                    }
+                }
+            };
+
+            window.submitLoginForm = function(e, forcedMode) {
+                if (e && typeof e.preventDefault === "function") e.preventDefault();
+                const userInput = document.getElementById("login-username");
+                const passInput = document.getElementById("login-password");
+                const spotifyInput = document.getElementById("login-spotify-input");
+                const rawUser = (userInput ? userInput.value : "").trim();
+                const passVal = (passInput ? passInput.value : "").trim();
+                const spotifyVal = (spotifyInput ? spotifyInput.value : "").trim();
+
+                if (!rawUser) {
+                    showBanner("login-status-msg", "Please enter your username or email first.", true);
+                    showToast("Please enter a username or email.");
+                    if (userInput) userInput.focus();
+                    return false;
+                }
+
+                let displayName = rawUser;
+                let emailStr = "";
+                if (rawUser.includes("@")) {
+                    emailStr = rawUser;
+                    displayName = rawUser.split("@")[0].trim() || rawUser;
+                }
+
+                const existing = getStoredAccount() || {};
+                const acc = {
+                    ...existing,
+                    username: displayName,
+                    email: emailStr || existing.email || "",
+                    raw_input: rawUser,
+                    logged_in_at: Date.now()
+                };
+                localStorage.setItem("spotiless_account", JSON.stringify(acc));
+                localStorage.setItem("spotiless_account_name", rawUser);
+                localStorage.setItem("spotiless_username", displayName);
+                if (emailStr) localStorage.setItem("spotiless_account_email", emailStr);
+                if (passVal) localStorage.setItem("spotiless_account_has_pass", "1");
+
+                if (spotifyVal) {
+                    saveSpotifyInput(spotifyVal);
+                }
+
+                const modeUsed = forcedMode || activeMode;
+                const verb = modeUsed === "signup" ? "Account created" : "Signed in";
+                showBanner("login-status-msg", `${verb} as ${displayName}! Opening game...`, false);
+                showToast(`${verb} as ${displayName}!`);
+                syncView();
+                window.location.href = "index.html";
+                return false;
+            };
+
+            window.connectSpotifyAndPlay = async function() {
+                const field = document.getElementById("spotify-link-field");
+                const raw = (field ? field.value : "").trim();
+                if (!raw) {
+                    showBanner("spotify-status-msg", "Paste a Spotify playlist link or your sp_dc cookie first.", true);
+                    if (field) field.focus();
+                    return;
+                }
+
+                const kind = saveSpotifyInput(raw);
+                if (kind === "playlist") {
+                    try {
+                        const res = await fetch("/api/playlists/load_custom", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ url_or_id: raw })
+                        });
+                        if (res.ok) {
+                            const data = await res.json();
+                            if (data && data.success) {
+                                window.location.href = "index.html";
+                                return;
+                            }
+                        }
+                    } catch (err) {}
+                    showBanner("spotify-status-msg", "Spotify playlist saved! Opening game...", false);
+                } else {
+                    showBanner("spotify-status-msg", "Spotify cookie linked! Opening game...", false);
+                }
+
+                if (!getStoredAccount()) {
+                    const fallback = { username: "Spotify Player", email: "", raw_input: "Spotify Player", logged_in_at: Date.now() };
+                    localStorage.setItem("spotiless_account", JSON.stringify(fallback));
+                    localStorage.setItem("spotiless_account_name", "Spotify Player");
+                    localStorage.setItem("spotiless_username", "Spotify Player");
+                }
+                syncView();
+                window.location.href = "index.html";
+            };
+
+            window.unlinkSpotifyOnPage = function() {
+                localStorage.removeItem("spotiless_sp_dc");
+                localStorage.removeItem("sp_dc");
+                localStorage.removeItem("spotiless_linked_playlist");
+                showBanner("spotify-status-msg", "Spotify connection removed.", false);
+                syncView();
+            };
+
+            window.playAsGuest = function() {
+                sessionStorage.setItem("spotiless_guest_session", "true");
+                window.location.href = "index.html";
+            };
+
+            // Edit Username & Sign Out
+            const btnEdit = document.getElementById("btn-edit-username");
+            const editBox = document.getElementById("edit-username-box");
+            const editInput = document.getElementById("input-edit-username");
+            const btnSaveUser = document.getElementById("btn-save-username");
+            const btnCancelUser = document.getElementById("btn-cancel-username");
+            const btnSignOut = document.getElementById("btn-sign-out");
+
+            if (btnEdit && editBox) {
+                btnEdit.addEventListener("click", () => {
+                    editBox.classList.remove("hidden");
+                    const acc = getStoredAccount();
+                    if (editInput) {
+                        editInput.value = (acc && acc.username) || "";
+                        editInput.focus();
+                    }
+                });
+            }
+            if (btnCancelUser && editBox) {
+                btnCancelUser.addEventListener("click", () => editBox.classList.add("hidden"));
+            }
+            if (btnSaveUser && editInput) {
+                btnSaveUser.addEventListener("click", () => {
+                    const nextName = editInput.value.trim();
+                    if (!nextName) return;
+                    const acc = getStoredAccount() || {};
+                    acc.username = nextName;
+                    localStorage.setItem("spotiless_account", JSON.stringify(acc));
+                    localStorage.setItem("spotiless_username", nextName);
+                    localStorage.setItem("spotiless_account_name", nextName);
+                    if (editBox) editBox.classList.add("hidden");
+                    syncView();
+                    showToast(`Username updated to ${nextName}!`);
+                });
+            }
+            if (btnSignOut) {
+                btnSignOut.addEventListener("click", async () => {
+                    localStorage.removeItem("spotiless_account");
+                    localStorage.removeItem("spotiless_account_name");
+                    localStorage.removeItem("spotiless_account_email");
+                    localStorage.removeItem("spotiless_username");
+                    localStorage.removeItem("spotiless_account_has_pass");
+                    localStorage.removeItem("spotiless_sp_dc");
+                    localStorage.removeItem("sp_dc");
+                    localStorage.removeItem("spotiless_linked_playlist");
+                    sessionStorage.removeItem("spotiless_guest_session");
+                    try { await fetch("/api/auth/logout", { method: "POST" }); } catch (e) {}
+                    syncView();
+                    showToast("Signed out.");
+                });
+            }
+
+            syncView();
+        })();
+    </script>
+</body>
+</html>

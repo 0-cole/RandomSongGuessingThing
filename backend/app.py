@@ -14,7 +14,7 @@ from backend.game_engine import GameEngine
 
 STATIC_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
 
-__version__ = '1.4.2'
+__version__ = '1.4.3'
 
 app = Flask(__name__, static_folder=STATIC_DIR)
 
@@ -29,6 +29,10 @@ game_engine.load_pool(mode="easy")
 @app.route("/")
 def index():
     return send_from_directory(STATIC_DIR, "index.html")
+
+@app.route("/login")
+def login_page():
+    return send_from_directory(STATIC_DIR, "login.html")
 
 @app.route("/<path:filename>")
 def serve_static(filename):
