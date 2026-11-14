@@ -126,7 +126,11 @@ async function fetchPlaylistEmbed(playlistId) {
 
 async function fetchUserPublicPage(userId) {
     try {
-        const html = await fetchText(`https://open.spotify.com/user/${encodeURIComponent(userId)}`);
+        // Non-browser UA ("curl/8.4.0") triggers Spotify SSR with embedded initialState JSON
+        const html = await fetchText(`https://open.spotify.com/user/${encodeURIComponent(userId)}`, {
+            "User-Agent": "curl/8.4.0",
+            "Accept": "text/html"
+        });
         const state = parseInitialState(html);
         const items = state && state.entities && state.entities.items;
         if (!items) return null;

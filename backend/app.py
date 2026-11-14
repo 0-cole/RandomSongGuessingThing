@@ -376,7 +376,7 @@ def spotify_public_endpoint():
         display_name = uid
         avatar = ""
         try:
-            ur = req_lib.get(f"https://open.spotify.com/user/{urllib.parse.quote(uid)}", headers={"User-Agent": ua}, timeout=8)
+            ur = req_lib.get(f"https://open.spotify.com/user/{urllib.parse.quote(uid)}", headers={"User-Agent": "curl/8.4.0", "Accept": "text/html"}, timeout=8)
             if ur.status_code == 200:
                 im = re.search(r'<script[^>]*id="initialState"[^>]*>([\s\S]*?)</script>', ur.text)
                 if im:
