@@ -42,6 +42,8 @@ class MicroAudioEngine {
         this.onPlayStart = null;
         this.onPlayProgress = null; // (percent, currentSec)
         this.onPlayEnd = null;
+        this.onTrackMetaResolved = null;
+        this.resolvedTrackMeta = null;
     }
 
     initContext() {
@@ -208,6 +210,7 @@ class MicroAudioEngine {
         this.currentTrackId = trackId;
         this.audioBuffer = null;
         this.youtubeVideoId = null;
+        this.resolvedTrackMeta = null;
         this.startOffset = 0;
         this.highlightOffset = 0;
 
@@ -242,7 +245,17 @@ class MicroAudioEngine {
                     if (sRes.ok) {
                         const sData = await sRes.json();
                         const hit = (sData.results || []).find((r) => r && r.previewUrl);
-                        if (hit) previewUrl = hit.previewUrl;
+                        if (hit) {
+                            previewUrl = hit.previewUrl;
+                            this.resolvedTrackMeta = {
+                                trackId,
+                                image_url: hit.artworkUrl100 ? hit.artworkUrl100.replace("100x100bb", "600x600bb") : "",
+                                album_name: hit.collectionName || ""
+                            };
+                            if (this.onTrackMetaResolved && (this.resolvedTrackMeta.image_url || this.resolvedTrackMeta.album_name)) {
+                                this.onTrackMetaResolved(this.resolvedTrackMeta);
+                            }
+                        }
                     }
                 }
                 if (previewUrl) {
@@ -263,6 +276,16 @@ class MicroAudioEngine {
                     const ct = (apiRes.headers.get("content-type") || "").toLowerCase();
                     if (ct.includes("application/json")) {
                         serverFallbackData = await apiRes.json();
+                        if (serverFallbackData && (serverFallbackData.image_url || serverFallbackData.album_name)) {
+                            this.resolvedTrackMeta = {
+                                trackId,
+                                image_url: serverFallbackData.image_url || "",
+                                album_name: serverFallbackData.album_name || ""
+                            };
+                            if (this.onTrackMetaResolved) {
+                                this.onTrackMetaResolved(this.resolvedTrackMeta);
+                            }
+                        }
                         if (serverFallbackData && serverFallbackData.preview_url) {
                             arrayBuffer = await this.fetchPreviewArrayBuffer(serverFallbackData.preview_url);
                         }
@@ -720,7 +743,10 @@ class MicroAudioEngine {
         await this.ensureContextRunning();
         if (!this.audioBuffer && this.youtubeVideoId) {
             this.pendingPlayFull = null;
-            this.playSnippet(30, fromHighlight ? (this.highlightOffset || 25) : 25, loop);
+            const ytDuration = (this.ytPlayer && typeof this.ytPlayer.getDuration === "function" && this.ytPlayer.getDuration()) || 300;
+            const ytStart = fromHighlight ? (this.highlightOffset || 25) : 0;
+            const playLen = Math.max(30, ytDuration - ytStart);
+            this.playSnippet(playLen, ytStart, loop);
             return;
         }
         if (!this.audioBuffer) {

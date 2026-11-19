@@ -720,6 +720,49 @@ document.addEventListener("DOMContentLoaded", () => {
         return refreshPlaylistsInFlight;
     }
 
+    function normalizeSmartText(str, oneAsL = false) {
+        const leetMap = {
+            "0": "o",
+            "1": oneAsL ? "l" : "i",
+            "2": "z",
+            "3": "e",
+            "4": "a",
+            "5": "s",
+            "6": "g",
+            "7": "t",
+            "8": "b",
+            "9": "g",
+            "@": "a",
+            "$": "s",
+            "!": "i",
+            "|": "l",
+            "+": "t"
+        };
+        return String(str || "")
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .toLowerCase()
+            .replace(/[0123456789@$!|+]/g, (ch) => leetMap[ch] || ch)
+            .replace(/[^a-z0-9\s]/g, " ")
+            .replace(/\s+/g, " ")
+            .trim();
+    }
+
+    function matchesSmartText(haystack, needle) {
+        const rawH = String(haystack || "").toLowerCase().trim();
+        const rawN = String(needle || "").toLowerCase().trim();
+        if (!rawN) return false;
+        if (rawH.includes(rawN)) return true;
+
+        const h1 = normalizeSmartText(haystack, false);
+        const n1 = normalizeSmartText(needle, false);
+        if (n1 && h1.includes(n1)) return true;
+
+        const h2 = normalizeSmartText(haystack, true);
+        const n2 = normalizeSmartText(needle, true);
+        return Boolean(n2 && h2.includes(n2));
+    }
+
     const CloudGameManager = {
         defaultTracks: [],
         tracks: [],
@@ -935,7 +978,12 @@ document.addEventListener("DOMContentLoaded", () => {
             if (trackId && trackId === track.id) {
                 isMatch = true;
             } else if (normGuess) {
-                if (normGuess.includes(normTitle) || normTitle.includes(normGuess)) {
+                if (
+                    normGuess.includes(normTitle) ||
+                    normTitle.includes(normGuess) ||
+                    matchesSmartText(track.name, text) ||
+                    matchesSmartText(text, track.name)
+                ) {
                     isMatch = true;
                 }
             }
@@ -1016,11 +1064,12 @@ document.addEventListener("DOMContentLoaded", () => {
         },
 
         search: function(query) {
-            const q = query.toLowerCase().trim();
+            const q = query.trim();
             if (!q) return [];
-            return this.tracks.filter(t => 
-                t.name.toLowerCase().includes(q) || 
-                t.artist.toLowerCase().includes(q)
+            return this.tracks.filter(t =>
+                matchesSmartText(t.name, q) ||
+                matchesSmartText(t.artist, q) ||
+                matchesSmartText(`${t.name} ${t.artist}`, q)
             ).slice(0, 8);
         }
     };
@@ -1056,6 +1105,24 @@ document.addEventListener("DOMContentLoaded", () => {
             labelPlaybackTime.textContent = `${currentRound.unlocked_seconds}s`;
         }
         resetTimelineFills();
+    };
+
+    audio.onTrackMetaResolved = (meta) => {
+        if (!meta) return;
+        const cur = CloudGameManager.getCurrentTrack();
+        if (cur && cur.id === meta.trackId) {
+            if (meta.image_url) {
+                cur.image_url = meta.image_url;
+                cur.thumbnail_url = meta.image_url;
+            }
+            if (meta.album_name) {
+                cur.album_name = meta.album_name;
+            }
+        }
+        if (modalReveal && !modalReveal.classList.contains("hidden") && currentRound && currentRound.round_id === meta.trackId) {
+            if (meta.image_url && revealAlbumArt) revealAlbumArt.src = meta.image_url;
+            if (meta.album_name && revealAlbumName) revealAlbumName.textContent = meta.album_name;
+        }
     };
 
     let idleVisualizerDrawn = false;
@@ -1747,6 +1814,66 @@ document.addEventListener("DOMContentLoaded", () => {
         inputGuess.focus();
     });
 
+    function launchSmallConfetti() {
+        const existing = document.getElementById("spotiless-confetti-canvas");
+        if (existing) existing.remove();
+
+        const c = document.createElement("canvas");
+        c.id = "spotiless-confetti-canvas";
+        c.style.cssText = "position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none;z-index:2000;";
+        c.width = window.innerWidth;
+        c.height = window.innerHeight;
+        document.body.appendChild(c);
+
+        const ctx2d = c.getContext("2d");
+        const colors = ["#1db954", "#1ed760", "#fde68a", "#60a5fa", "#f472b6", "#ffffff"];
+        const cx = c.width / 2;
+        const cy = c.height * 0.36;
+        const particles = Array.from({ length: 30 }, () => {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = 2.5 + Math.random() * 5.5;
+            return {
+                x: cx + (Math.random() - 0.5) * 80,
+                y: cy + (Math.random() - 0.5) * 30,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed - 3.2,
+                size: 5 + Math.random() * 4,
+                rot: Math.random() * Math.PI * 2,
+                vRot: (Math.random() - 0.5) * 0.25,
+                color: colors[Math.floor(Math.random() * colors.length)],
+                alpha: 1
+            };
+        });
+
+        const start = performance.now();
+        function frame(now) {
+            const elapsed = now - start;
+            if (elapsed > 1400) {
+                c.remove();
+                return;
+            }
+            ctx2d.clearRect(0, 0, c.width, c.height);
+            particles.forEach((p) => {
+                p.vy += 0.16;
+                p.vx *= 0.99;
+                p.x += p.vx;
+                p.y += p.vy;
+                p.rot += p.vRot;
+                p.alpha = Math.max(0, 1 - elapsed / 1400);
+
+                ctx2d.save();
+                ctx2d.globalAlpha = p.alpha;
+                ctx2d.translate(p.x, p.y);
+                ctx2d.rotate(p.rot);
+                ctx2d.fillStyle = p.color;
+                ctx2d.fillRect(-p.size / 2, -p.size / 4, p.size, p.size / 2);
+                ctx2d.restore();
+            });
+            requestAnimationFrame(frame);
+        }
+        requestAnimationFrame(frame);
+    }
+
     // ----------------- Reveal Modal & Victory -----------------
     function showRevealModal(state) {
         const track = state.solution;
@@ -1762,13 +1889,7 @@ document.addEventListener("DOMContentLoaded", () => {
             // Subtle pulsing animation on album artwork upon correct guess
             if (revealAlbumArt) revealAlbumArt.classList.add("pulse");
             if (coverWrapper) coverWrapper.classList.add("pulse");
-
-            // Auto-play the whole song when guessed right until pressing Next
-            setTimeout(() => {
-                if (modalReveal && !modalReveal.classList.contains("hidden")) {
-                    audio.playFull(false, true);
-                }
-            }, 60);
+            launchSmallConfetti();
         } else {
             if (revealAlbumArt) revealAlbumArt.classList.remove("pulse");
             if (coverWrapper) coverWrapper.classList.remove("pulse");
@@ -1777,10 +1898,18 @@ document.addEventListener("DOMContentLoaded", () => {
             revealSubtitle.textContent = "Better luck on the next one!";
         }
 
+        // Auto-play the full song on reveal (both win and loss/give-up) until pressing Next
+        setTimeout(() => {
+            if (modalReveal && !modalReveal.classList.contains("hidden")) {
+                audio.playFull(false, true);
+            }
+        }, 60);
+
+        const resolvedMeta = audio.resolvedTrackMeta && audio.resolvedTrackMeta.trackId === track.id ? audio.resolvedTrackMeta : null;
         revealSongName.textContent = track.name;
         revealArtistName.textContent = track.artist;
-        revealAlbumName.textContent = track.album_name || "";
-        revealAlbumArt.src = track.image_url || track.thumbnail_url || "";
+        revealAlbumName.textContent = (resolvedMeta && resolvedMeta.album_name) || track.album_name || "";
+        revealAlbumArt.src = (resolvedMeta && resolvedMeta.image_url) || track.image_url || track.thumbnail_url || "";
 
         // Render emoji grid
         revealEmojiGrid.innerHTML = "";

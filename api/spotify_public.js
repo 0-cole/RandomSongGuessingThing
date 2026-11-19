@@ -205,7 +205,7 @@ async function queryPathfinder(operationName, sha256Hash, variables, token) {
 }
 
 async function fetchPlaylistPathfinder(playlistId, token) {
-    if (!playlistId || !token) return { owner_id: "", owner_name: "" };
+    if (!playlistId || !token) return { owner_id: "", owner_name: "", trackMetaMap: new Map() };
     const data = await queryPathfinder(
         "fetchPlaylist",
         PATHFINDER_HASHES.fetchPlaylist,
@@ -217,7 +217,42 @@ async function fetchPlaylistPathfinder(playlistId, token) {
     const ownerUri = (ownerData && ownerData.uri) || "";
     const ownerId = (ownerData && ownerData.username) || (ownerUri.includes(":") ? ownerUri.split(":").pop() : "");
     const ownerName = (ownerData && ownerData.name) || ownerId || "";
-    return { owner_id: ownerId, owner_name: ownerName };
+
+    const trackMetaMap = new Map();
+    const items = (pl && pl.content && Array.isArray(pl.content.items)) ? pl.content.items : [];
+    items.forEach((entry) => {
+        const t = entry && entry.itemV2 && entry.itemV2.data;
+        if (!t) return;
+        const uri = t.uri || "";
+        const tid = uri.includes(":") ? uri.split(":").pop() : "";
+        const album = t.albumOfTrack || {};
+        const sources = (album.coverArt && album.coverArt.sources) || [];
+        const bestImg = (sources[sources.length - 1] && sources[sources.length - 1].url) || (sources[0] && sources[0].url) || "";
+        const thumbImg = (sources[0] && sources[0].url) || bestImg;
+        if (tid && (bestImg || album.name)) {
+            trackMetaMap.set(tid, {
+                image_url: bestImg,
+                thumbnail_url: thumbImg,
+                album_name: album.name || ""
+            });
+        }
+    });
+
+    return { owner_id: ownerId, owner_name: ownerName, trackMetaMap };
+}
+
+function applyTrackMeta(tracks, trackMetaMap) {
+    if (!Array.isArray(tracks) || !trackMetaMap || !trackMetaMap.size) return tracks;
+    return tracks.map((t) => {
+        const meta = trackMetaMap.get(t.id);
+        if (!meta) return t;
+        return {
+            ...t,
+            image_url: meta.image_url || t.image_url,
+            thumbnail_url: meta.thumbnail_url || meta.image_url || t.thumbnail_url,
+            album_name: meta.album_name || t.album_name
+        };
+    });
 }
 
 async function discoverUserAndPlaylistsByPathfinder(query, token) {
@@ -329,6 +364,7 @@ async function loadPlaylistAndCreator(playlistId) {
 
     const token = embed.accessToken || await getAnonymousAccessToken();
     const meta = await fetchPlaylistPathfinder(playlistId, token);
+    const tracksWithArt = applyTrackMeta(embed.tracks, meta.trackMetaMap);
     const ownerId = meta.owner_id || "";
     const ownerName = meta.owner_name || (embed.playlist && embed.playlist.owner_name) || "";
 
@@ -367,7 +403,7 @@ async function loadPlaylistAndCreator(playlistId) {
     return {
         playlist: embed.playlist,
         playlists: Array.from(playlistsMap.values()),
-        tracks: embed.tracks,
+        tracks: tracksWithArt,
         user_id: ownerId,
         username: resolvedDisplayName
     };
@@ -377,45 +413,69 @@ async function resolveTrackPreviewWaterfall(trackId, q) {
     let previewUrl = "";
     let source = "";
     let youtubeVideoId = "";
+    let imageUrl = "";
+    let albumName = "";
 
-    // Source A: Spotify Embed MP3 preview
+    // Source A: Spotify Embed MP3 preview + real track album art
     if (trackId && /^[a-zA-Z0-9]{22}$/.test(trackId)) {
         try {
             const html = await fetchText(`https://open.spotify.com/embed/track/${encodeURIComponent(trackId)}`);
             const nextData = parseNextData(html);
             const entity = nextData && nextData.props && nextData.props.pageProps && nextData.props.pageProps.state && nextData.props.pageProps.state.data && nextData.props.pageProps.state.data.entity;
-            if (entity && entity.audioPreview && entity.audioPreview.url) {
-                previewUrl = entity.audioPreview.url;
-                source = "spotify_embed";
+            if (entity) {
+                const imgSources = (entity.visualIdentity && entity.visualIdentity.image) || (entity.coverArt && entity.coverArt.sources) || [];
+                if (imgSources.length) {
+                    imageUrl = (imgSources[imgSources.length - 1] && imgSources[imgSources.length - 1].url) || (imgSources[0] && imgSources[0].url) || "";
+                }
+                if (entity.audioPreview && entity.audioPreview.url) {
+                    previewUrl = entity.audioPreview.url;
+                    source = "spotify_embed";
+                }
             }
         } catch (e) {}
     }
 
     // Source B: iTunes Search API
-    if (!previewUrl && q) {
+    if ((!previewUrl || !imageUrl) && q) {
         try {
             const itRes = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(q)}&entity=song&limit=3`);
             if (itRes.ok) {
                 const itData = await itRes.json();
-                const hit = (itData.results || []).find((r) => r && r.previewUrl);
+                const hit = (itData.results || []).find((r) => r && r.previewUrl) || (itData.results || [])[0];
                 if (hit) {
-                    previewUrl = hit.previewUrl;
-                    source = "itunes";
+                    if (!previewUrl && hit.previewUrl) {
+                        previewUrl = hit.previewUrl;
+                        source = "itunes";
+                    }
+                    if (!imageUrl && hit.artworkUrl100) {
+                        imageUrl = hit.artworkUrl100.replace("100x100bb", "600x600bb");
+                    }
+                    if (!albumName && hit.collectionName) {
+                        albumName = hit.collectionName;
+                    }
                 }
             }
         } catch (e) {}
     }
 
     // Source C: Deezer Public Search API
-    if (!previewUrl && q) {
+    if ((!previewUrl || !imageUrl) && q) {
         try {
             const dzRes = await fetch(`https://api.deezer.com/search?q=${encodeURIComponent(q)}&limit=3`);
             if (dzRes.ok) {
                 const dzData = await dzRes.json();
-                const hit = (dzData.data || []).find((r) => r && r.preview);
+                const hit = (dzData.data || []).find((r) => r && r.preview) || (dzData.data || [])[0];
                 if (hit) {
-                    previewUrl = hit.preview;
-                    source = "deezer";
+                    if (!previewUrl && hit.preview) {
+                        previewUrl = hit.preview;
+                        source = "deezer";
+                    }
+                    if (!imageUrl && hit.album) {
+                        imageUrl = hit.album.cover_big || hit.album.cover_medium || "";
+                    }
+                    if (!albumName && hit.album && hit.album.title) {
+                        albumName = hit.album.title;
+                    }
                 }
             }
         } catch (e) {}
@@ -437,7 +497,9 @@ async function resolveTrackPreviewWaterfall(trackId, q) {
         success: Boolean(previewUrl || youtubeVideoId),
         preview_url: previewUrl,
         source,
-        youtube_video_id: youtubeVideoId
+        youtube_video_id: youtubeVideoId,
+        image_url: imageUrl,
+        album_name: albumName
     };
 }
 
@@ -577,6 +639,11 @@ module.exports = async function handler(req, res) {
 
         const topPlaylists = playlists.filter((p) => p && p.id).slice(0, 25);
         const results = await Promise.allSettled(topPlaylists.map((p) => fetchPlaylistEmbed(p.id)));
+        const firstEmbedWithToken = results.find((r) => r.status === "fulfilled" && r.value && r.value.accessToken);
+        const pfToken = (firstEmbedWithToken && firstEmbedWithToken.value.accessToken) || await getAnonymousAccessToken();
+        const pfMetaResults = pfToken
+            ? await Promise.allSettled(topPlaylists.map((p) => fetchPlaylistPathfinder(p.id, pfToken)))
+            : [];
 
         const hydratedPlaylists = [];
         const allTracks = [];
@@ -590,14 +657,16 @@ module.exports = async function handler(req, res) {
                 if (plOwner === "spotify" && resolvedUserId.toLowerCase() !== "spotify") {
                     return;
                 }
+                const pfMeta = pfMetaResults[idx] && pfMetaResults[idx].status === "fulfilled" ? pfMetaResults[idx].value : null;
+                const tracksWithArt = pfMeta && pfMeta.trackMetaMap ? applyTrackMeta(r.value.tracks, pfMeta.trackMetaMap) : r.value.tracks;
                 hydratedPlaylists.push({
                     id: pl.id,
                     name: pl.name || basePl.name,
                     image: pl.image || basePl.image || "",
-                    tracks_count: r.value.tracks.length,
+                    tracks_count: tracksWithArt.length,
                     owner_name: pl.owner_name || basePl.owner_name || ""
                 });
-                r.value.tracks.forEach((t) => {
+                tracksWithArt.forEach((t) => {
                     const key = t.id || `${t.name.toLowerCase()}::${t.artist.toLowerCase()}`;
                     if (!seenTrackKeys.has(key)) {
                         seenTrackKeys.add(key);
