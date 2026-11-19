@@ -33,6 +33,8 @@
         })();
     </script>
     <link rel="stylesheet" href="style.css?v=1.4.7">
+    <link rel="stylesheet" href="guide_widget.css?v=1.4.7">
+    <script src="guide_widget.js?v=1.4.7" defer></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400..800;1,9..40,400..800&family=Poppins:wght@600;700;800;900&display=swap" rel="stylesheet">
@@ -388,6 +390,7 @@
                                 <li><strong>PC Desktop Cookie:</strong> Open <a href="https://open.spotify.com" target="_blank" rel="noopener noreferrer" style="color: var(--color-spotify); text-decoration: underline;">open.spotify.com</a>, press <kbd style="background: rgba(255,255,255,0.1); padding: 1px 4px; border-radius: 3px;">F12</kbd> &rarr; <strong>Application &gt; Cookies</strong> &rarr; copy <code>sp_dc</code>.</li>
                             </ol>
                         </details>
+                        <div data-spotify-photo-guide></div>
                         <div style="margin-top: 10px; border-top: 1px solid var(--border-color); padding-top: 10px;">
                             <button type="button" class="btn btn-secondary btn-full" onclick="if(window.closeAuthModalAndPlay){window.closeAuthModalAndPlay();}else{document.getElementById('modal-auth').classList.add('hidden');}" style="font-weight: 700; font-size: 0.85rem;">
                                 ▶ Play Free Hits Now (Skip Spotify Link)
@@ -534,9 +537,10 @@
                     <input type="text" id="input-custom-playlist" placeholder="Paste Spotify profile link, public playlist link, or username..." style="flex: 1; height: 46px; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 0 14px; color: var(--color-text); font-size: 0.9rem; outline: none;">
                     <button id="btn-load-custom-playlist" class="btn btn-secondary" style="height: 46px; padding: 0 18px; font-weight: 700;">Load & Play</button>
                 </div>
-                <div class="niche-song-warning" style="background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.35); border-radius: 10px; padding: 10px 12px; margin-bottom: 16px; font-size: 0.78rem; color: #fde68a; line-height: 1.45;">
+                <div class="niche-song-warning" style="background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.35); border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; font-size: 0.78rem; color: #fde68a; line-height: 1.45;">
                     <strong>⚠️ Public Playlists &amp; Niche / Spotify-Exclusive Songs:</strong> Paste your <strong>Spotify profile link</strong>, <strong>any public playlist link</strong> (auto-discovers your other public playlists too), or <strong>username</strong> — make sure playlists are set to <strong>Public</strong>. Extremely niche tracks (remixes, leaks, local uploads) might not exist on web audio sources; Spoti-Less auto-skips unplayable songs <strong>without hurting your streak</strong>.
                 </div>
+                <div data-spotify-photo-guide style="margin-bottom: 16px;"></div>
 
                 <!-- Your Created Playlists -->
                 <div class="section-header-row">

@@ -23,6 +23,8 @@
         })();
     </script>
     <link rel="stylesheet" href="style.css?v=1.4.7">
+    <link rel="stylesheet" href="guide_widget.css?v=1.4.7">
+    <script src="guide_widget.js?v=1.4.7" defer></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400..800;1,9..40,400..800&family=Poppins:wght@600;700;800;900&display=swap" rel="stylesheet">
@@ -233,6 +235,7 @@
                     <div>
                         <label class="login-field-label" for="login-spotify-input">Spotify Username or Public Playlist Link <span style="font-weight: 400; color: var(--color-text-subtle);">(optional — playlists must be Public)</span></label>
                         <input type="text" id="login-spotify-input" class="login-input" placeholder="Paste your Spotify profile link, username, or public playlist link">
+                        <div data-spotify-photo-guide></div>
                     </div>
 
                     <div class="btn-row-stack">
@@ -271,6 +274,8 @@
                         Unlink Spotify
                     </button>
                 </div>
+
+                <div data-spotify-photo-guide data-open="true" style="margin-top: 12px;"></div>
 
                 <details style="margin-top: 12px; font-size: 0.78rem; color: var(--color-text-muted); background: var(--bg-surface-elevated); border-radius: var(--radius-sm); padding: 10px 12px; border: 1px solid var(--border-color);">
                     <summary style="cursor: pointer; font-weight: 700; color: var(--color-spotify);">How to make a playlist Public or copy your Spotify link?</summary>

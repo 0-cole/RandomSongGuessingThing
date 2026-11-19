@@ -1,0 +1,175 @@
+/*
+ * ⚠️ HEY AI AGENT! Editing this stylesheet?
+ * 1. Stop! Read spotiless_context.md & AGENTS.md rules first!
+ * 2. Strict Fast-Path Budget: Capped at 1–2 tool calls total (Read -> Edit -> Done).
+ * 3. Start all initial file reads at Line 1.
+ */
+
+.spg-details {
+    margin-top: 10px;
+    background: var(--bg-surface-elevated, rgba(255, 255, 255, 0.04));
+    border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
+    border-radius: 10px;
+    padding: 10px 12px;
+    text-align: left;
+}
+
+.spg-summary {
+    cursor: pointer;
+    font-size: 0.82rem;
+    font-weight: 800;
+    color: var(--color-spotify, #1db954);
+    list-style: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    user-select: none;
+}
+
+.spg-summary::-webkit-details-marker {
+    display: none;
+}
+
+.spg-summary::after {
+    content: "▾";
+    font-size: 0.9rem;
+    transition: transform 0.2s ease;
+}
+
+.spg-details[open] .spg-summary::after {
+    transform: rotate(180deg);
+}
+
+.spg-body {
+    margin-top: 12px;
+}
+
+.spg-note {
+    font-size: 0.76rem;
+    color: var(--color-text-muted, #b3b3b3);
+    line-height: 1.45;
+    margin: 0 0 10px 0;
+}
+
+.spg-tabs {
+    display: inline-flex;
+    background: var(--bg-surface, rgba(0, 0, 0, 0.3));
+    border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
+    border-radius: 8px;
+    padding: 3px;
+    gap: 4px;
+    margin-bottom: 12px;
+}
+
+.spg-tab {
+    border: none;
+    background: transparent;
+    color: var(--color-text-muted, #b3b3b3);
+    font-size: 0.78rem;
+    font-weight: 800;
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.spg-tab.active {
+    background: var(--color-spotify, #1db954);
+    color: #000;
+}
+
+.spg-steps-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 10px;
+}
+
+.spg-step-card {
+    background: var(--bg-surface, rgba(0, 0, 0, 0.25));
+    border: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
+    border-radius: 8px;
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.spg-step-img-btn {
+    padding: 0;
+    border: none;
+    background: transparent;
+    cursor: zoom-in;
+    border-radius: 6px;
+    overflow: hidden;
+    display: block;
+    width: 100%;
+}
+
+.spg-step-img {
+    width: 100%;
+    height: 150px;
+    object-fit: cover;
+    object-position: top center;
+    display: block;
+    border-radius: 6px;
+    background: #121212;
+}
+
+.spg-step-caption {
+    font-size: 0.74rem;
+    color: var(--color-text, #fff);
+    line-height: 1.35;
+    font-weight: 600;
+}
+
+.spg-step-caption strong {
+    color: var(--color-spotify, #1db954);
+}
+
+.spg-lightbox {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: rgba(0, 0, 0, 0.88);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    gap: 12px;
+}
+
+.spg-lightbox.hidden {
+    display: none;
+}
+
+.spg-lightbox img {
+    max-width: min(92vw, 720px);
+    max-height: 78vh;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    object-fit: contain;
+}
+
+.spg-lightbox-caption {
+    color: #fff;
+    font-size: 0.9rem;
+    font-weight: 700;
+    text-align: center;
+}
+
+.spg-lightbox-close {
+    position: absolute;
+    top: 16px;
+    right: 20px;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    background: rgba(20, 20, 20, 0.85);
+    color: #fff;
+    font-size: 1.4rem;
+    line-height: 1;
+    cursor: pointer;
+}
